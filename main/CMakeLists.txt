@@ -3,7 +3,7 @@ idf_component_register(
         "main.cpp"
         "Constants.h"
         "esp_random_max.h"
-        "hue_to_rgb.h"
+        "actual_led_strip_set_pixel_hsv.h"
         "Animation.hpp"
         "BlinkComplement.hpp"
         "Blinkvolution.hpp"
