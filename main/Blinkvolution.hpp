@@ -82,6 +82,10 @@ public:
     vTaskDelay(450 / portTICK_PERIOD_MS);
   }
 
+  int getDelay() {
+    return 25;
+  }
+
 private:
   uint16_t primaryHue;
   uint16_t secondaryHue;

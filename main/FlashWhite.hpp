@@ -14,6 +14,8 @@ public:
         led_strip_set_pixel(strip, i, 255, 255, 255);
       }
     }
+
+    int getDelay() { return 25; }
 };
 
 #endif

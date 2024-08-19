@@ -12,6 +12,8 @@ public:
     virtual int steps() = 0;
     virtual void loop() = 0;
 
+    virtual int getDelay() = 0;
+
 protected:
     led_strip_handle_t& strip;
 };

@@ -4,6 +4,7 @@
 #include "led_strip.h"
 #include "Animation.hpp"
 #include "Constants.h"
+#include "hue_to_rgb.h"
 
 class RainbowSingleColorSlice : public Animation {
 public:
@@ -26,9 +27,13 @@ public:
 
     void loop() override {
         for (int i = 0; i < NUM_PIXELS; i++) {
+            actual_led_strip_set_pixel_hsv(strip, i, hues[i]);
             hues[i] += adding ? 100 : -100;
-            led_strip_set_pixel_hsv(strip, i, hues[i], 255, 255);
         }
+    }
+
+    int getDelay() {
+        return 50;
     }
 
 private:

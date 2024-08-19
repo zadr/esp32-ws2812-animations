@@ -33,6 +33,10 @@ public:
         }
     }
 
+    int getDelay() {
+        return 35;
+    }
+
 private:
     bool adding;
     uint16_t* hues;

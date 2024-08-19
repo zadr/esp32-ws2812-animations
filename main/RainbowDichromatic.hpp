@@ -43,6 +43,10 @@ public:
         animate();
     }
 
+    int getDelay() {
+        return 25;
+    }
+
 private:
     uint16_t hues[NUM_PIXELS * 2];
     int currentHueIndex; // 0 - 6 (for the 7 color pairs)

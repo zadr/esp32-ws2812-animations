@@ -1,5 +1,5 @@
 #ifndef HUE_TO_RGB
-#define HUE_TO_RGB_MAX
+#define HUE_TO_RGB
 
 #include "led_strip.h"
 #include "esp_log.h"
@@ -48,7 +48,7 @@ static void hue_to_rgb(uint16_t h, uint32_t &r, uint32_t &g, uint32_t &b) {
 static void actual_led_strip_set_pixel_hsv(led_strip_handle_t strip, uint32_t index, uint16_t hue) {
   uint32_t r = 0; uint32_t g = 0; uint32_t b = 0;
   hue_to_rgb(hue, r, g, b);
-  led_strip_set_pixel(strip, index, r, g, b);
+  led_strip_set_pixel(strip, index, r / 2, g / 2, b / 2); // divide by two to reduce brightness
 }
 
 #endif

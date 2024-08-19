@@ -33,34 +33,32 @@ RainbowDichromatic rainbowDichromaticForwards(led_strip, true);
 RainbowDichromatic rainbowDichromaticBackwards(led_strip, false);
 DropIn dropInForward(led_strip, true);
 DropIn dropInBackwards(led_strip, false);
-// BlinkComplement blinkComplementRandomHueConsistently(led_strip, false, true);
-// BlinkComplement blinkComplementRandomHueDifferently(led_strip, true, true);
-// Blinkvolution blinkvolution(led_strip);
+BlinkComplement blinkComplementRandomHueConsistently(led_strip, false, true, false);
+BlinkComplement blinkComplementRandomHueDifferently(led_strip, true, true, false);
+Blinkvolution blinkvolution(led_strip);
 
 Animation* animations[] = {
-  &fullRainbowForward,
-  &fullRainbowBackward,
-  &dropInForward,
-  &dropInBackwards,
-  &rainbowSliceForward,
-  &rainbowSliceBackward,
-  &rainbowDichromaticForwards,
-  &rainbowDichromaticBackwards,
-  // &blinkComplementRandomHueConsistently,
-  // &blinkComplementRandomHueDifferently,
+  &fullRainbowForward, // 0
+  &fullRainbowBackward, // 1
+  &dropInForward, // 2
+  &dropInBackwards, // 3
+  &rainbowSliceForward, // 4
+  &rainbowSliceBackward, // 5
+  // &rainbowDichromaticForwards, // lol
+  // &rainbowDichromaticBackwards, // also lol
+  // &blinkComplementRandomHueConsistently, // needs random
+  // &blinkComplementRandomHueDifferently, // needs random
   // &blinkvolution,
 };
 
 Animation* currentAnimation = nullptr;
 
 static void configure_led(void) {
-  ESP_LOGI("config", "Example configured to blink addressable LED!");
   led_strip_config_t strip_config = {};
   strip_config.strip_gpio_num = 23;
   strip_config.max_leds = NUM_PIXELS;
 
   led_strip_rmt_config_t rmt_config = {};
-  // rmt_config.resolution_hz = 1000 * 100 * 10; // 1000 * 800; // 800KHz
   rmt_config.flags.with_dma = false;
 
   ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
@@ -96,31 +94,29 @@ void rainbow(void) {
   }
 }
 
-// void inOrder(void) {
-//   ESP_LOGI("animation", "Starting %s!", __FUNCTION__);
+void inOrder(void) {
+  ESP_LOGI("animation", "Starting %s!", __FUNCTION__);
 
-//   while (1) {
-//     int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
-//     for (int i = 0; i < numberOfAnimations; i++) {
-//       animations[i]->setup();
+  int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
+  for (int i = 0; i < numberOfAnimations; i++) {
+    animations[i]->setup();
 
-//       int numberOfSteps = animations[i]->steps();
-//       for (int step = 0; step < numberOfSteps; step++) {
-//         animations[i]->loop();
-//         led_strip_refresh(led_strip);
-//         delay(25);
-//       }
-//     }
-//   }
-// }
+    int numberOfSteps = animations[i]->steps();
+    for (int step = 0; step < numberOfSteps; step++) {
+      animations[i]->loop();
+      led_strip_refresh(led_strip);
+      delay(animations[i]->getDelay());
+    }
+  }
+}
 
-// void randomlySelect(void) {
-//   ESP_LOGI("animation", "Starting %s!", __FUNCTION__);
+void randomlySelect(void) {
+  ESP_LOGI("animation", "Starting %s", __FUNCTION__);
 
-//   int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
-//   int actualAnimationIndex =  esp_random_max(numberOfAnimations);
-
-//   animations[actualAnimationIndex]->setup();
+  int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
+  int actualAnimationIndex =  esp_random_max(numberOfAnimations);
+  ESP_LOGI("animation", "Picking %d of %d", actualAnimationIndex, numberOfAnimations);
+  animations[actualAnimationIndex]->setup();
 
   // if (currentAnimation != nullptr) {
   //   AnimatedPrepareForAnimation animatedPrepareForAnimation(ws2812b, currentAnimation, animations[actualAnimationIndex]);
@@ -132,38 +128,41 @@ void rainbow(void) {
   //   }
   // }
 
-  // currentAnimation = animations[actualAnimationIndex];
+  currentAnimation = animations[actualAnimationIndex];
+
+  int numberOfSteps = animations[actualAnimationIndex]->steps();
 
   // repeat a few times to look good
-  // for (int i = 0; i < esp_random_max(6); i++) {
-  //   int numberOfSteps = animations[actualAnimationIndex]->steps();
-  //   for (int step = 0; step < numberOfSteps; step++) {
-  //     animations[actualAnimationIndex]->loop();
-  //     led_strip_refresh(led_strip);
-  //     delay(25);
+  for (int i = 0; i < esp_random_max(6); i++) {
+    for (int step = 0; step < numberOfSteps; step++) {
+      animations[actualAnimationIndex]->loop();
+      led_strip_refresh(led_strip);
+      delay(animations[actualAnimationIndex]->getDelay());
+    }
+  }
+
+  // // repeat a few times to look good
+  // for (int animationIndex = 0 ;; animationIndex++) {
+  //   for (int i = 0; i < esp_random_max(8); i++) {
+  //       int actualAnimationIndex = animationIndex % (sizeof(animations) / sizeof(animations[0]));
+
+  //       animations[actualAnimationIndex]->setup();
+  //       int numberOfSteps = animations[actualAnimationIndex]->steps();
+  //       for (int step = 0; step < numberOfSteps; step++) {
+  //         animations[actualAnimationIndex]->loop();
+  //         led_strip_refresh(led_strip);
+  //         delay(animations[actualAnimationIndex]->getDelay());
+  //       }
+  //     }
   //   }
-  // }
-
-  // repeat a few times to look good
-//   for (int animationIndex = 0 ;; animationIndex++) {
-//     for (int i = 0; i < esp_random_max(8); i++) {
-//         int actualAnimationIndex = animationIndex % (sizeof(animations) / sizeof(animations[0]));
-
-//         animations[actualAnimationIndex]->setup();
-//         int numberOfSteps = animations[actualAnimationIndex]->steps();
-//         for (int step = 0; step < numberOfSteps; step++) {
-//           animations[actualAnimationIndex]->loop();
-//           led_strip_refresh(led_strip);
-//           delay(25);
-//         }
-//       }
-//     }
-// }
+}
 
 extern "C" void app_main(void) {
   configure_led();
-  // basic_blink();
-  rainbow();
-  // inOrder();
-  // randomlySelect();
+  while (1) {
+    // basic_blink();
+    // rainbow();
+    // inOrder();
+    randomlySelect();
+  }
 }

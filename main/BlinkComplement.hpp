@@ -7,8 +7,8 @@
 
 class BlinkComplement : public Animation {
 public:
-  BlinkComplement(led_strip_handle_t& strip, bool zeroIsPrimaryHue, bool changeHueEachLoop, bool fullRandom, uint16_t primaryHue)
-    : Animation(strip), zeroIsPrimaryHue(true), changeHueEachLoop(changeHueEachLoop), fullRandom(fullRandom), primaryHue(primaryHue) {
+  BlinkComplement(led_strip_handle_t& strip, bool zeroIsPrimaryHue, bool changeHueEachLoop, bool fullRandom)
+    : Animation(strip), zeroIsPrimaryHue(true), changeHueEachLoop(changeHueEachLoop), fullRandom(fullRandom) {
   }
   ~BlinkComplement() {}
 
@@ -71,6 +71,10 @@ public:
     }
 
     zeroIsPrimaryHue = !zeroIsPrimaryHue;
+  }
+
+  int getDelay() {
+    return 25;
   }
 private:
   bool zeroIsPrimaryHue;

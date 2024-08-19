@@ -3,6 +3,7 @@
 
 #include "Animation.hpp"
 #include "Constants.h"
+#include "hue_to_rgb.h"
 
 class DropIn : public Animation {
 public:
@@ -21,38 +22,49 @@ public:
   }
 
   void loop() {
-    int offset = (forward ? 1 : -1);
-    if ((forward && currentStep < NUM_PIXELS) || (!forward && currentStep >= 0)) {
-      currentStep += offset;
+    if (forward) {
+      currentStep += 1;
+      if (currentStep >= NUM_PIXELS) {
+        currentStep = 0;
+        hueIndex += 1;
+      }
     } else {
-      currentStep = forward ? 0 : NUM_PIXELS;
-      hueIndex += offset;
+      currentStep -= 1;
+      if (currentStep < 0) {
+        currentStep = NUM_PIXELS;
+        hueIndex -= 1;
+      }
     }
 
     switch (hueIndex) {
     case 0:
-      led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_RED, RANDOM_PERCENT(30)), 255, 255);
+      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_RED, RANDOM_PERCENT(30)));
       break;
     case 1:
-      led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_ORANGE, RANDOM_PERCENT(30)), 255, 255);
+      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_ORANGE, RANDOM_PERCENT(30)));
       break;
     case 2:
-      led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_YELLOW, RANDOM_PERCENT(30)), 255, 255);
+      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_YELLOW, RANDOM_PERCENT(30)));
       break;
     case 3:
-      led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_GREEN, RANDOM_PERCENT(30)), 255, 255);
+      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_GREEN, RANDOM_PERCENT(30)));
       break;
     case 4:
-      led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_BLUE, RANDOM_PERCENT(30)), 255, 255);
+      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_BLUE, RANDOM_PERCENT(30)));
       break;
     case 5:
-      led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_INDIGO, RANDOM_PERCENT(30)), 255, 255);
+      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_INDIGO, RANDOM_PERCENT(30)));
       break;
     case 6:
-      led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_VIOLET, RANDOM_PERCENT(30)), 255, 255);
+      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_VIOLET, RANDOM_PERCENT(30)));
       break;
     }
   }
+
+  int getDelay() {
+    return 100;
+  }
+
 private:
     int currentStep;
     int hueIndex;

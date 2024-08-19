@@ -4,7 +4,7 @@
 #include "esp_random.h"
 
 static uint16_t esp_random_max(uint32_t max) {
-  return esp_random() % max;
+  return (esp_random() % (max + 1)) - 1;
 }
 
 #endif
