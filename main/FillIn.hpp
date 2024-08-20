@@ -3,14 +3,14 @@
 
 #include "Animation.hpp"
 #include "Constants.h"
-#include "hue_to_rgb.h"
+#include "actual_led_strip_set_pixel_hsv.h"
 
-class DropIn : public Animation {
+class FillIn : public Animation {
 public:
-  DropIn(led_strip_handle_t& ws2812b, bool forward)
+  FillIn(led_strip_handle_t& ws2812b, bool forward)
     : Animation(ws2812b), currentStep(0), hueIndex(0), forward(forward) {
   }
-  ~DropIn() {}
+  ~FillIn() {}
 
   void setup() {
     currentStep = forward ? 0 : NUM_PIXELS;
@@ -62,7 +62,7 @@ public:
   }
 
   int getDelay() {
-    return 100;
+    return 25;
   }
 
 private:

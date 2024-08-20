@@ -11,7 +11,7 @@
 #include "Constants.h"
 #include "Blinkvolution.hpp"
 #include "BlinkComplement.hpp"
-#include "DropIn.hpp"
+#include "FillIn.hpp"
 #include "FlashWhite.hpp"
 #include "RainbowFull.hpp"
 #include "RainbowSingleColorSlice.hpp"
@@ -31,8 +31,8 @@ RainbowSingleColorSlice rainbowSliceForward(led_strip, true);
 RainbowSingleColorSlice rainbowSliceBackward(led_strip, false);
 RainbowDichromatic rainbowDichromaticForwards(led_strip, true);
 RainbowDichromatic rainbowDichromaticBackwards(led_strip, false);
-DropIn dropInForward(led_strip, true);
-DropIn dropInBackwards(led_strip, false);
+FillIn fillInForward(led_strip, true);
+FillIn fillInBackwards(led_strip, false);
 BlinkComplement blinkComplementRandomHueConsistently(led_strip, false, true, false);
 BlinkComplement blinkComplementRandomHueDifferently(led_strip, true, true, false);
 Blinkvolution blinkvolution(led_strip);
@@ -40,8 +40,8 @@ Blinkvolution blinkvolution(led_strip);
 Animation* animations[] = {
   &fullRainbowForward, // 0
   &fullRainbowBackward, // 1
-  &dropInForward, // 2
-  &dropInBackwards, // 3
+  &fillInForward, // 2
+  &fillInBackwards, // 3
   &rainbowSliceForward, // 4
   &rainbowSliceBackward, // 5
   // &rainbowDichromaticForwards, // lol
@@ -84,13 +84,13 @@ void basic_blink(void) {
 
 void rainbow(void) {
   ESP_LOGI("animation", "Starting %s!", __FUNCTION__);
-  fullRainbowForward.setup();
+  dropInForward.setup();
 
-  for (int i = 0; i < fullRainbowForward.steps(); i++) {
+  for (int i = 0; i < dropInForward.steps(); i++) {
     ESP_LOGI("animation", "Looping %s step %d", __FUNCTION__, i);
-    fullRainbowForward.loop();
+    dropInForward.loop();
     led_strip_refresh(led_strip);
-    vTaskDelay(25 / portTICK_PERIOD_MS);
+    vTaskDelay(dropInForward.getDelay());
   }
 }
 
@@ -161,8 +161,8 @@ extern "C" void app_main(void) {
   configure_led();
   while (1) {
     // basic_blink();
-    // rainbow();
+    rainbow();
     // inOrder();
-    randomlySelect();
+    // randomlySelect();
   }
 }

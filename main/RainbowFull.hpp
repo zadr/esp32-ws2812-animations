@@ -4,7 +4,7 @@
 #include "led_strip.h"
 #include "Constants.h"
 #include "Animation.hpp"
-#include "hue_to_rgb.h"
+#include "actual_led_strip_set_pixel_hsv.h"
 
 class FullRainbow : public Animation {
 public:

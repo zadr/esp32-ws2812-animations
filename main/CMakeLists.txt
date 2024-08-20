@@ -7,7 +7,7 @@ idf_component_register(
         "Animation.hpp"
         "BlinkComplement.hpp"
         "Blinkvolution.hpp"
-        "DropIn.hpp"
+        "FillIn.hpp"
         "Fibonacci.hpp"
         "FlashWhite.hpp"
         "RainbowDichromatic.hpp"
