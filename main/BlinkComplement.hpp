@@ -52,8 +52,8 @@ public:
       setup();
     }
 
-    uint16_t primaryColor = zeroIsPrimaryHue ? primaryHue : COMPLEMENT(primaryHue);
-    uint16_t secondaryColor = zeroIsPrimaryHue ? COMPLEMENT(primaryHue) : primaryHue;
+    uint16_t primaryColor = zeroIsPrimaryHue ? primaryHue : drift(primaryHue, 90);
+    uint16_t secondaryColor = zeroIsPrimaryHue ?  drift(primaryHue, 90) : primaryHue;
     for (int i = 0; i <= 4; i++) {
       for (int i = 0; i < NUM_PIXELS; i += 8) {
         for (int j = i; j <= i + 4; j++) {
@@ -67,7 +67,7 @@ public:
       primaryColor = secondaryColor;
       secondaryColor = temp;
       led_strip_refresh(strip);
-      vTaskDelay(333 / portTICK_PERIOD_MS);
+      delay(333);
     }
 
     zeroIsPrimaryHue = !zeroIsPrimaryHue;

@@ -1,5 +1,5 @@
-#ifndef DROPIN_HPP
-#define DROPIN_HPP
+#ifndef FILLIN_HPP
+#define FILLIN_HPP
 
 #include "Animation.hpp"
 #include "Constants.h"
@@ -38,25 +38,25 @@ public:
 
     switch (hueIndex) {
     case 0:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_RED, RANDOM_PERCENT(30)));
+      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_RED, esp_random_max(30)));
       break;
     case 1:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_ORANGE, RANDOM_PERCENT(30)));
+      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_ORANGE, esp_random_max(30)));
       break;
     case 2:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_YELLOW, RANDOM_PERCENT(30)));
+      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_YELLOW, esp_random_max(30)));
       break;
     case 3:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_GREEN, RANDOM_PERCENT(30)));
+      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_GREEN, esp_random_max(30)));
       break;
     case 4:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_BLUE, RANDOM_PERCENT(30)));
+      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_BLUE, esp_random_max(30)));
       break;
     case 5:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_INDIGO, RANDOM_PERCENT(30)));
+      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_INDIGO, esp_random_max(30)));
       break;
     case 6:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, DRIFT(HUE_VIOLET, RANDOM_PERCENT(30)));
+      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_VIOLET, esp_random_max(30)));
       break;
     }
   }

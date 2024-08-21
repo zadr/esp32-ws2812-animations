@@ -1,18 +1,21 @@
 idf_component_register(
     SRCS
         "main.cpp"
+        "color_utils.hpp"
         "Constants.h"
         "esp_random_max.h"
         "actual_led_strip_set_pixel_hsv.h"
         "Animation.hpp"
         "BlinkComplement.hpp"
         "Blinkvolution.hpp"
+        "Bounce.hpp"
+        "DropIn.hpp"
         "FillIn.hpp"
         "Fibonacci.hpp"
         "FlashWhite.hpp"
         "RainbowDichromatic.hpp"
-        "RainbowFibonacci.hpp"
         "RainbowFull.hpp"
         "RainbowSingleColorSlice.hpp"
+        "Twinkle.hpp"
     INCLUDE_DIRS "."
 )

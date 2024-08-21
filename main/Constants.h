@@ -14,9 +14,7 @@
 #define HUE_VIOLET 49151 // 75% of 65535
 
 // constrain complementary colors to the range of hues we have available
-#define COMPLEMENT(HUE) (HUE + ((HUE_VIOLET - HUE_RED) / 2)) % (HUE_VIOLET - HUE_RED)
-#define DRIFT(HUE, PERCENT) (HUE + ((HUE_VIOLET - HUE_RED) * ((PERCENT / 100) * 360)))
-#define RANDOM_PERCENT(MAX) esp_random_max(MAX) * ((esp_random_max(100) % 2 == 0) ? 1 : -1)
+#define COMPLEMENT(hue) (((hue) + 24576) % 49152)
 #define delay(time) vTaskDelay(time / portTICK_PERIOD_MS);
 
 #endif

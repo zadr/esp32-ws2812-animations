@@ -11,11 +11,16 @@
 #include "Constants.h"
 #include "Blinkvolution.hpp"
 #include "BlinkComplement.hpp"
+#include "Bounce.hpp"
+#include "DropIn.hpp"
+#include "DropOff.hpp"
 #include "FillIn.hpp"
 #include "FlashWhite.hpp"
+#include "RainbowDichromatic.hpp"
 #include "RainbowFull.hpp"
 #include "RainbowSingleColorSlice.hpp"
 #include "RainbowDichromatic.hpp"
+#include "Twinkle.hpp"
 
 #include "esp_random_max.h"
 
@@ -31,11 +36,19 @@ RainbowSingleColorSlice rainbowSliceForward(led_strip, true);
 RainbowSingleColorSlice rainbowSliceBackward(led_strip, false);
 RainbowDichromatic rainbowDichromaticForwards(led_strip, true);
 RainbowDichromatic rainbowDichromaticBackwards(led_strip, false);
+// RainbowFibonacci rainbowFibonacciForwards(led_strip, true);
+// RainbowFibonacci rainbowFibonacciBackwards(led_strip, false);
+DropIn dropInForward(led_strip, true);
+DropIn dropInBackwards(led_strip, false);
+DropOff dropOffForward(led_strip, true);
+DropOff dropOffBackwards(led_strip, false);
 FillIn fillInForward(led_strip, true);
 FillIn fillInBackwards(led_strip, false);
-BlinkComplement blinkComplementRandomHueConsistently(led_strip, false, true, false);
-BlinkComplement blinkComplementRandomHueDifferently(led_strip, true, true, false);
+BlinkComplement blinkComplementRandomHueConsistently(led_strip, false, true, true);
+BlinkComplement blinkComplementRandomHueDifferently(led_strip, true, true, true);
 Blinkvolution blinkvolution(led_strip);
+Bounce bounce(led_strip);
+Twinkle twinkle(led_strip);
 
 Animation* animations[] = {
   &fullRainbowForward, // 0
@@ -44,6 +57,11 @@ Animation* animations[] = {
   &fillInBackwards, // 3
   &rainbowSliceForward, // 4
   &rainbowSliceBackward, // 5
+  &bounce, // 6
+  &bounce, // 7 looks great show it more
+  &twinkle, // 8
+  &dropOffForward, // 9 // looks bad if we can't turn individual light on/off without refreshing whole strip
+  // &dropOffBackwards, // 10 // doesn't work yet
   // &rainbowDichromaticForwards, // lol
   // &rainbowDichromaticBackwards, // also lol
   // &blinkComplementRandomHueConsistently, // needs random
@@ -83,14 +101,15 @@ void basic_blink(void) {
 }
 
 void rainbow(void) {
+  auto animation = blinkComplementRandomHueConsistently;
   ESP_LOGI("animation", "Starting %s!", __FUNCTION__);
-  dropInForward.setup();
+  animation.setup();
 
-  for (int i = 0; i < dropInForward.steps(); i++) {
+  for (int i = 0; i < animation.steps(); i++) {
     ESP_LOGI("animation", "Looping %s step %d", __FUNCTION__, i);
-    dropInForward.loop();
+    animation.loop();
     led_strip_refresh(led_strip);
-    vTaskDelay(dropInForward.getDelay());
+    vTaskDelay(animation.getDelay());
   }
 }
 
@@ -161,8 +180,8 @@ extern "C" void app_main(void) {
   configure_led();
   while (1) {
     // basic_blink();
-    rainbow();
+    // rainbow();
     // inOrder();
-    // randomlySelect();
+    randomlySelect();
   }
 }

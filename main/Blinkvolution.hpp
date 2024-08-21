@@ -3,6 +3,7 @@
 
 #include "Animation.hpp"
 #include "Constants.h"
+#include "color_utils.hpp"
 #include "esp_random_max.h"
 
 class Blinkvolution : public Animation {
@@ -64,11 +65,11 @@ public:
     }
 
     if (shouldAlternatePrimaryHue) {
-      primaryHue = DRIFT(primaryHue, RANDOM_PERCENT(120));
+      primaryHue = drift(primaryHue, esp_random_max(120));
       alternatedPrimaryColorCounter++;
       alternatedSecondaryColorCounter = 0;
     } else {
-      secondaryHue = DRIFT(secondaryHue, RANDOM_PERCENT(120));
+      secondaryHue = drift(secondaryHue, esp_random_max(120));
       alternatedPrimaryColorCounter = 0;
       alternatedSecondaryColorCounter++;
     }
@@ -77,13 +78,10 @@ public:
     primaryHue = primaryHue ^ secondaryHue;
     secondaryHue = primaryHue ^ secondaryHue;
     primaryHue = primaryHue ^ secondaryHue;
-
-    led_strip_refresh(strip);
-    vTaskDelay(450 / portTICK_PERIOD_MS);
   }
 
   int getDelay() {
-    return 25;
+    return 450;
   }
 
 private:
