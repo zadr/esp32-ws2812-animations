@@ -38,7 +38,7 @@ public:
       primaryHue = HUE_VIOLET;
       break;
     }
-    secondaryHue = COMPLEMENT(primaryHue);
+    secondaryHue = drift(primaryHue, 180);
   }
 
   int steps() {
@@ -83,6 +83,10 @@ public:
   int getDelay() {
     return 450;
   }
+
+  int minIterations() override { return 1; }
+  int maxIterations() override { return 2; }
+  int tag() override { return 1001; }
 
 private:
   uint16_t primaryHue;

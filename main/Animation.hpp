@@ -13,6 +13,10 @@ public:
     virtual void loop() = 0;
 
     virtual int getDelay() = 0;
+    virtual int minIterations() = 0;
+    virtual int maxIterations() = 0;
+
+    virtual int tag() = 0;
 
 protected:
     led_strip_handle_t& strip;

@@ -25,6 +25,10 @@ public:
         return 650;
     }
 
+    int minIterations() override { return 1; }
+    int maxIterations() override { return 2; }
+    int tag() override { return 1009; }
+
     void loop() override {
         for (int i = 0; i < NUM_PIXELS; i++) {
             actual_led_strip_set_pixel_hsv(strip, i, hues[i]);

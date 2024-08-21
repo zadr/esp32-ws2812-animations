@@ -24,8 +24,12 @@ public:
   }
 
   int steps() override {
-    return 72;
+    return 432;
   }
+
+  int minIterations() override { return 2; }
+  int maxIterations() override { return 4; }
+  int tag() override { return 1010; }
 
   void loop() override {
     // Clear twinkled LEDs that have completed their duration
@@ -41,7 +45,7 @@ public:
     }
 
     // Twinkle random LEDs with complementary hues, ensuring no more than 12 are active
-    while (twinkleCount < 12) {
+    while (twinkleCount < 36) {
       uint16_t index = esp_random_max(NUM_PIXELS);
       while (
         twinkleDurations[index] > 0 && // make sure we don't turn a light thats on back on again
@@ -63,7 +67,7 @@ public:
   }
 
   int getDelay() override {
-    return 25;
+    return 10;
   }
 
 private:

@@ -23,8 +23,12 @@ public:
     }
 
     int steps() override {
-        return 650;
+        return 1950;
     }
+
+    int minIterations() override { return 2; }
+    int maxIterations() override { return 4; }
+    int tag() override { return 1008; }
 
     void loop() override {
         for (int i = 0; i < NUM_PIXELS; i++) {

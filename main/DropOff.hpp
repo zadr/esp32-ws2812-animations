@@ -52,29 +52,35 @@ public:
     }
 
     for (uint16_t i = 0; i < NUM_PIXELS; i++) {
-        for (int16_t j = NUM_PIXELS - 1; j >= i; j -= 4) {
-            led_strip_clear(strip);
+      int16_t j = NUM_PIXELS - 1 - i;
+      if (j % 4 == 0) {
+        led_strip_clear(strip);
 
-            // Light the current dropping LED
-            actual_led_strip_set_pixel_hsv(strip, j, hueToDrop);
+        // Light the current dropping LED
+        actual_led_strip_set_pixel_hsv(strip, j, hueToDrop);
 
-            // Keep fully dropped LEDs on
-            for (int16_t k = 0; k < 4; k++) {
-                if (j - k >= 0) {
-                    actual_led_strip_set_pixel_hsv(strip, j - k, hueToDrop);
-                }
-            }
-
-            led_strip_refresh(strip);
-            delay(getDelay());                    // Wait before moving to the next LED
+        // Keep fully dropped LEDs on
+        for (int16_t k = 0; k < 4; k++) {
+          if (j - k >= 0) {
+            actual_led_strip_set_pixel_hsv(strip, j - k, hueToDrop);
+          }
         }
+
+        led_strip_refresh(strip);
+        delay(getDelay()); // Wait before moving to the next LED
+      }
     }
+
     hueIndex += forward ? 1 : -1;
   }
 
   int getDelay() {
     return 50;
   }
+
+  int minIterations() override { return 1; }
+  int maxIterations() override { return 1; }
+  int tag() override { return 1004; }
 
 private:
     int currentStep;

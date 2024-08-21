@@ -7,8 +7,8 @@
 
 class FillIn : public Animation {
 public:
-  FillIn(led_strip_handle_t& ws2812b, bool forward)
-    : Animation(ws2812b), currentStep(0), hueIndex(0), forward(forward) {
+  FillIn(led_strip_handle_t& strip, bool forward)
+    : Animation(strip), currentStep(0), hueIndex(0), activeHue(0), forward(forward) {
   }
   ~FillIn() {}
 
@@ -22,6 +22,7 @@ public:
   }
 
   void loop() {
+    int oldHueIndex = hueIndex;
     if (forward) {
       currentStep += 1;
       if (currentStep >= NUM_PIXELS) {
@@ -35,39 +36,48 @@ public:
         hueIndex -= 1;
       }
     }
+    int newHueIndex = hueIndex;
 
-    switch (hueIndex) {
-    case 0:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_RED, esp_random_max(30)));
-      break;
-    case 1:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_ORANGE, esp_random_max(30)));
-      break;
-    case 2:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_YELLOW, esp_random_max(30)));
-      break;
-    case 3:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_GREEN, esp_random_max(30)));
-      break;
-    case 4:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_BLUE, esp_random_max(30)));
-      break;
-    case 5:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_INDIGO, esp_random_max(30)));
-      break;
-    case 6:
-      actual_led_strip_set_pixel_hsv(strip, currentStep, drift(HUE_VIOLET, esp_random_max(30)));
-      break;
+    if (newHueIndex != oldHueIndex) {
+      switch (hueIndex) {
+      case 0:
+        activeHue = drift(HUE_RED, esp_random_max(30));
+        break;
+      case 1:
+        activeHue = drift(HUE_ORANGE, esp_random_max(30));
+        break;
+      case 2:
+        activeHue = drift(HUE_YELLOW, esp_random_max(30));
+        break;
+      case 3:
+        activeHue = drift(HUE_GREEN, esp_random_max(30));
+        break;
+      case 4:
+        activeHue = drift(HUE_BLUE, esp_random_max(30));
+        break;
+      case 5:
+        activeHue = drift(HUE_INDIGO, esp_random_max(30));
+        break;
+      case 6:
+        activeHue = drift(HUE_VIOLET, esp_random_max(30));
+        break;
+      }
     }
+    actual_led_strip_set_pixel_hsv(strip, currentStep, activeHue);
   }
 
   int getDelay() {
-    return 25;
+    return 10;
   }
+
+  int minIterations() override { return 1; }
+  int maxIterations() override { return 2; }
+  int tag() override { return 1005; }
 
 private:
     int currentStep;
     int hueIndex;
+    int activeHue;
     bool forward;
 };
 

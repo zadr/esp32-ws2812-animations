@@ -2,7 +2,7 @@
 #define CONSTANTS_H
 
 #define PIN_WS2812B 12
-#define NUM_PIXELS 144
+#define NUM_PIXELS 144 * 3
 #define HUE_MAX 65535
 
 #define HUE_RED 0

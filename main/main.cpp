@@ -36,8 +36,6 @@ RainbowSingleColorSlice rainbowSliceForward(led_strip, true);
 RainbowSingleColorSlice rainbowSliceBackward(led_strip, false);
 RainbowDichromatic rainbowDichromaticForwards(led_strip, true);
 RainbowDichromatic rainbowDichromaticBackwards(led_strip, false);
-// RainbowFibonacci rainbowFibonacciForwards(led_strip, true);
-// RainbowFibonacci rainbowFibonacciBackwards(led_strip, false);
 DropIn dropInForward(led_strip, true);
 DropIn dropInBackwards(led_strip, false);
 DropOff dropOffForward(led_strip, true);
@@ -46,30 +44,23 @@ FillIn fillInForward(led_strip, true);
 FillIn fillInBackwards(led_strip, false);
 BlinkComplement blinkComplementRandomHueConsistently(led_strip, false, true, true);
 BlinkComplement blinkComplementRandomHueDifferently(led_strip, true, true, true);
-Blinkvolution blinkvolution(led_strip);
 Bounce bounce(led_strip);
 Twinkle twinkle(led_strip);
 
 Animation* animations[] = {
   &fullRainbowForward, // 0
   &fullRainbowBackward, // 1
-  &fillInForward, // 2
-  &fillInBackwards, // 3
-  &rainbowSliceForward, // 4
-  &rainbowSliceBackward, // 5
-  &bounce, // 6
-  &bounce, // 7 looks great show it more
-  &twinkle, // 8
-  &dropOffForward, // 9 // looks bad if we can't turn individual light on/off without refreshing whole strip
-  // &dropOffBackwards, // 10 // doesn't work yet
-  // &rainbowDichromaticForwards, // lol
-  // &rainbowDichromaticBackwards, // also lol
-  // &blinkComplementRandomHueConsistently, // needs random
-  // &blinkComplementRandomHueDifferently, // needs random
-  // &blinkvolution,
+  &rainbowSliceForward, // 2
+  &rainbowSliceBackward, // 3
+  &dropInForward, // 4
+  &dropOffForward, // 5
+  &fillInForward, // 6
+  &fillInBackwards, // 7
+  // &blinkComplementRandomHueConsistently,
+  // &blinkComplementRandomHueDifferently,
+  &bounce, // 8
+  &twinkle, // 9
 };
-
-Animation* currentAnimation = nullptr;
 
 static void configure_led(void) {
   led_strip_config_t strip_config = {};
@@ -101,7 +92,7 @@ void basic_blink(void) {
 }
 
 void rainbow(void) {
-  auto animation = blinkComplementRandomHueConsistently;
+  auto animation = fillInBackwards;
   ESP_LOGI("animation", "Starting %s!", __FUNCTION__);
   animation.setup();
 
@@ -133,47 +124,24 @@ void randomlySelect(void) {
   ESP_LOGI("animation", "Starting %s", __FUNCTION__);
 
   int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
-  int actualAnimationIndex =  esp_random_max(numberOfAnimations);
-  ESP_LOGI("animation", "Picking %d of %d", actualAnimationIndex, numberOfAnimations);
+  int actualAnimationIndex = 4; // esp_random_max(numberOfAnimations + 1) - 1;
+  ESP_LOGI("animation", "Picking %d of %d (tag %d)", actualAnimationIndex, numberOfAnimations, animations[actualAnimationIndex]->tag());
   animations[actualAnimationIndex]->setup();
-
-  // if (currentAnimation != nullptr) {
-  //   AnimatedPrepareForAnimation animatedPrepareForAnimation(ws2812b, currentAnimation, animations[actualAnimationIndex]);
-  //   animatedPrepareForAnimation.setup();
-  //   for (int step = 0; step < animatedPrepareForAnimation.steps(); step++) {
-  //     animatedPrepareForAnimation.loop();
-  //     led_strip_refresh(led_strip);
-  //     delay(25);
-  //   }
-  // }
-
-  currentAnimation = animations[actualAnimationIndex];
 
   int numberOfSteps = animations[actualAnimationIndex]->steps();
 
   // repeat a few times to look good
-  for (int i = 0; i < esp_random_max(6); i++) {
+  int range = animations[actualAnimationIndex]->maxIterations() - animations[actualAnimationIndex]->minIterations();
+  int repetitionCount = esp_random_max(range) + animations[actualAnimationIndex]->minIterations();
+  if (repetitionCount > 6) { repetitionCount = 6; }
+  // for (int i = 0; i < repetitionCount; i++) {
     for (int step = 0; step < numberOfSteps; step++) {
+      ESP_LOGI("animation", "step %d of %d", step, numberOfSteps);
       animations[actualAnimationIndex]->loop();
       led_strip_refresh(led_strip);
       delay(animations[actualAnimationIndex]->getDelay());
     }
-  }
-
-  // // repeat a few times to look good
-  // for (int animationIndex = 0 ;; animationIndex++) {
-  //   for (int i = 0; i < esp_random_max(8); i++) {
-  //       int actualAnimationIndex = animationIndex % (sizeof(animations) / sizeof(animations[0]));
-
-  //       animations[actualAnimationIndex]->setup();
-  //       int numberOfSteps = animations[actualAnimationIndex]->steps();
-  //       for (int step = 0; step < numberOfSteps; step++) {
-  //         animations[actualAnimationIndex]->loop();
-  //         led_strip_refresh(led_strip);
-  //         delay(animations[actualAnimationIndex]->getDelay());
-  //       }
-  //     }
-  //   }
+  // }
 }
 
 extern "C" void app_main(void) {

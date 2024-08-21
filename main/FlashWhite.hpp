@@ -16,6 +16,9 @@ public:
     }
 
     int getDelay() { return 25; }
+    int minIterations() override { return 1; }
+    int maxIterations() override { return 2; }
+    int tag() override { return 1006; }
 };
 
 #endif

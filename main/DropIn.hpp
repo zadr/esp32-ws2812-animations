@@ -48,12 +48,14 @@ public:
       break;
     }
 
-    for (uint16_t i = 0; i < NUM_PIXELS; i++) {
+    ESP_LOGI("dropin", "a");
+    for (uint16_t i = 0; i < NUM_PIXELS; i += 6) {
+      ESP_LOGI("dropin", "b");
         led_strip_clear(strip);
-        for (int16_t j = NUM_PIXELS - 1; j >= i; j -= 4) {
+        for (int16_t j = NUM_PIXELS - 1; j >= i; j -= 6) {
             actual_led_strip_set_pixel_hsv(strip, j, hueToDrop);
 
-            for (int16_t k = 0; k < 4; k++) {
+            for (int16_t k = 0; k < 6; k++) {
                 if (j - k >= 0) {
                     actual_led_strip_set_pixel_hsv(strip, j - k, hueToDrop);
                 }
@@ -73,6 +75,11 @@ public:
   int getDelay() {
     return 25;
   }
+
+  int tag() override { return 1004; }
+
+  int minIterations() override { return 1; }
+  int maxIterations() override { return 3; }
 
 private:
     int currentStep;

@@ -55,6 +55,10 @@ public:
     return 10;
   }
 
+  int minIterations() override { return 2; }
+  int maxIterations() override { return 5; }
+  int tag() override { return 1002; }
+
 private:
   int16_t pos;
   int8_t direction;

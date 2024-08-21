@@ -76,6 +76,11 @@ public:
   int getDelay() {
     return 25;
   }
+
+  int tag() override { return 1000; }
+  int minIterations() override { return 1; }
+  int maxIterations() override { return 2; }
+
 private:
   bool zeroIsPrimaryHue;
   bool changeHueEachLoop;

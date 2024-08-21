@@ -47,6 +47,10 @@ public:
         return 25;
     }
 
+  int minIterations() override { return 1; }
+  int maxIterations() override { return 2; }
+  int tag() override { return 1007; }
+
 private:
     uint16_t hues[NUM_PIXELS * 2];
     int currentHueIndex; // 0 - 6 (for the 7 color pairs)
