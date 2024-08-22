@@ -12,7 +12,6 @@
 
 // my animations
 #include "Constants.h"
-// #include "Blinkvolution.hpp"
 #include "BlinkComplement.hpp"
 #include "Bounce.hpp"
 #include "DropIn.hpp"
@@ -47,8 +46,10 @@ DropOff dropOffForward(led_strip, true);
 DropOff dropOffBackwards(led_strip, false);
 FillIn fillInForward(led_strip, true);
 FillIn fillInBackwards(led_strip, false);
-BlinkComplement blinkComplementDefinedColors(led_strip, false);
-BlinkComplement blinkComplementAllHues(led_strip, true);
+BlinkComplement blinkComplementDefinedColors(led_strip, false, false);
+BlinkComplement blinkComplementAllHues(led_strip, true, false);
+BlinkComplement blinkComplementDefinedColorsEvolution(led_strip, false, true);
+BlinkComplement blinkComplementAllHuesEvolution(led_strip, true, true);
 Bounce bounce(led_strip);
 Twinkle twinkle(led_strip);
 
@@ -61,12 +62,14 @@ Animation* animations[] = {
   &dropOffForward, // 5
   &fillInForward, // 6
   &fillInBackwards, // 7
-  &blinkComplementDefinedColors,
-  &blinkComplementAllHues,
-  &bounce, // 8
-  &twinkle, // 9
-  &multiRainbowForwards, // 10
-  &multiRainbowBackwards, // 11
+  &blinkComplementDefinedColors, // 8
+  &blinkComplementAllHues, // 9
+  &bounce, // 10
+  &twinkle, // 11
+  &multiRainbowForwards, // 12
+  &multiRainbowBackwards, // 13
+  &blinkComplementDefinedColorsEvolution, // 14
+  &blinkComplementAllHuesEvolution, // 15
 };
 
 static void configure_led(void) {
@@ -99,7 +102,7 @@ void basic_blink(void) {
 }
 
 void single(void) {
-  auto animation = blinkComplementDefinedColors;
+  auto animation = blinkComplementAllHuesEvolution;
   ESP_LOGI("animation", "Starting %s!", __FUNCTION__);
   animation.setup();
 
@@ -143,7 +146,7 @@ void randomlySelect(void) {
   if (repetitionCount > 6) { repetitionCount = 6; }
   // for (int i = 0; i < repetitionCount; i++) {
     for (int step = 0; step < numberOfSteps; step++) {
-      ESP_LOGI("animation", "step %d of %d", step, numberOfSteps);
+      ESP_LOGI("animation", "Looping %s step %d", __FUNCTION__, step);
       animations[actualAnimationIndex]->loop();
       led_strip_refresh(led_strip);
       delay(animations[actualAnimationIndex]->getDelay());
@@ -164,5 +167,6 @@ extern "C" void app_main(void) {
     // single();
     // inOrder();
     randomlySelect();
+    delay(100);
   }
 }

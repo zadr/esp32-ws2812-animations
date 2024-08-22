@@ -4,13 +4,14 @@
 #include "Animation.hpp"
 #include "Constants.h"
 #include "color_utils.hpp"
+#include "esp_log.h"
 #include "esp_random_max.h"
 #include "actual_led_strip_set_pixel_hsv.h"
 
 class BlinkComplement : public Animation {
 public:
-  BlinkComplement(led_strip_handle_t& strip, bool fullRandom)
-    : Animation(strip), fullRandom(fullRandom), primaryHue(0), secondaryHue(0) {
+  BlinkComplement(led_strip_handle_t& strip, bool fullRandom, bool evolves)
+    : Animation(strip), fullRandom(fullRandom), primaryHue(0), secondaryHue(0), evolves(evolves) {
   }
   ~BlinkComplement() {}
 
@@ -69,10 +70,20 @@ public:
     }
 
     zeroIsPrimaryHue = !zeroIsPrimaryHue;
+
+    if (evolves) {
+      if (esp_random() % 2 == 0) {
+        int was = primaryHue;
+        primaryHue = drift(primaryHue, 3);
+      } else {
+        int was = secondaryHue;
+        secondaryHue = drift(secondaryHue, 3);
+      }
+    }
   }
 
   int getDelay() {
-    return 50;
+    return 333;
   }
 
   int tag() override { return 1000; }
@@ -84,6 +95,7 @@ private:
   bool fullRandom;
   uint16_t primaryHue;
   uint16_t secondaryHue;
+  bool evolves;
 };
 
 #endif

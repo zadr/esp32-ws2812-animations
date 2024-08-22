@@ -7,7 +7,6 @@ idf_component_register(
         "actual_led_strip_set_pixel_hsv.h"
         "Animation.hpp"
         "BlinkComplement.hpp"
-        "Blinkvolution.hpp"
         "Bounce.hpp"
         "DropIn.hpp"
         "FillIn.hpp"

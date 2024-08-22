@@ -14,7 +14,6 @@ the following animations exist and are in good shape (ready for use):
 9. BlinkComplement. Pick a starting color. Find the complementary color. alternate the two colors every 4 lights, swapping every few milliseconds.
 
 The following animations exist and are in bad shape (not recommended for use):
-1. Blinkvolution. Similar to BlinkComplement, but the colors drift around over time.
 2. RainbowDichromatic. A rainbow animation that has 2 colors, with a third animating in and a fourth animating out.
 
 The following animation exists but should only be used for debugging:

@@ -67,13 +67,12 @@ public:
   }
 
   int getDelay() override {
-    return 45;
+    return 100;
   }
 
 private:
   uint16_t backgroundHue;
   std::vector<int> twinkleDurations; // Stores the remaining duration for each twinkling LED
-  std::vector<int> activeTwinkles; // what lights are twinkling
   int twinkleCount;
 };
 
