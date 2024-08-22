@@ -18,7 +18,7 @@ public:
     }
 
     void setup() override {
-        int numberOfRainbows = esp_random_max(5) + 1; // max 6 min 1
+        int numberOfRainbows = esp_random_max(4) + 2; // max 7 min 2
         int numberOfLEDsPerRainbow = NUM_PIXELS / numberOfRainbows;
         uint16_t slice = HUE_MAX / numberOfLEDsPerRainbow;
         for (int i = 0; i < numberOfRainbows; i++) {
