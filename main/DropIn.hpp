@@ -48,14 +48,13 @@ public:
       break;
     }
 
-    ESP_LOGI("dropin", "a");
-    for (uint16_t i = 0; i < NUM_PIXELS; i += 6) {
-      ESP_LOGI("dropin", "b");
+    int amount = (NUM_PIXELS / 144) * 2;
+    for (uint16_t i = 0; i < NUM_PIXELS; i += amount) {
         led_strip_clear(strip);
-        for (int16_t j = NUM_PIXELS - 1; j >= i; j -= 6) {
+        for (int16_t j = NUM_PIXELS - 1; j >= i; j -= amount) {
             actual_led_strip_set_pixel_hsv(strip, j, hueToDrop);
 
-            for (int16_t k = 0; k < 6; k++) {
+            for (int16_t k = 0; k < amount; k++) {
                 if (j - k >= 0) {
                     actual_led_strip_set_pixel_hsv(strip, j - k, hueToDrop);
                 }
