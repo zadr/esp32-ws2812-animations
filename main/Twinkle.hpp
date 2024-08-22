@@ -44,7 +44,7 @@ public:
       }
     }
 
-    // Twinkle random LEDs with complementary hues, ensuring no more than 12 are active
+    // Twinkle random LEDs with complementary hues, ensuring no more than 36 are active
     while (twinkleCount < 36) {
       uint16_t index = esp_random_max(NUM_PIXELS);
       while (
@@ -55,8 +55,8 @@ public:
         index = esp_random_max(NUM_PIXELS);
       }
 
-      // Set a random duration for the twinkle (between 5 and 25 loops)
-      twinkleDurations[index] = esp_random_max(10) + 3;
+      // Set a random duration for the twinkle (between 3 and 15 loops)
+      twinkleDurations[index] = esp_random_max(12) + 3;
       twinkleCount++; // Increment the count of active twinkles
     }
 
