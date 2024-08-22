@@ -3,18 +3,21 @@
 
 #include "Animation.hpp"
 #include "Constants.h"
+#include "color_utils.hpp"
 #include "esp_random_max.h"
+#include "actual_led_strip_set_pixel_hsv.h"
 
 class BlinkComplement : public Animation {
 public:
-  BlinkComplement(led_strip_handle_t& strip, bool zeroIsPrimaryHue, bool changeHueEachLoop, bool fullRandom)
-    : Animation(strip), zeroIsPrimaryHue(true), changeHueEachLoop(changeHueEachLoop), fullRandom(fullRandom) {
+  BlinkComplement(led_strip_handle_t& strip, bool fullRandom)
+    : Animation(strip), fullRandom(fullRandom), primaryHue(0), secondaryHue(0) {
   }
   ~BlinkComplement() {}
 
   void setup() {
     if (fullRandom) {
       primaryHue = esp_random_max(HUE_VIOLET);
+      secondaryHue = drift(COMPLEMENT(primaryHue), 10);
       return;
     }
 
@@ -41,51 +44,46 @@ public:
       primaryHue = HUE_VIOLET;
       break;
     }
+
+    primaryHue = primaryHue;
+    secondaryHue = drift(COMPLEMENT(primaryHue), 10);
   }
 
   int steps() {
-    return NUM_PIXELS * 3;
+    return 24;
   }
 
   void loop() {
-    if (changeHueEachLoop) {
-      setup();
-    }
-
-    uint16_t primaryColor = zeroIsPrimaryHue ? primaryHue : drift(primaryHue, 90);
-    uint16_t secondaryColor = zeroIsPrimaryHue ?  drift(primaryHue, 90) : primaryHue;
     for (int i = 0; i <= 4; i++) {
       for (int i = 0; i < NUM_PIXELS; i += 8) {
-        for (int j = i; j <= i + 4; j++) {
-          led_strip_set_pixel_hsv(strip, j, secondaryColor, 255, 255);
+        for (int j = i; j < i + 4; j++) {
+          actual_led_strip_set_pixel_hsv(strip, j, secondaryHue);
         }
-        for (int j = i + 4; j <= i + 8; j++) {
-          led_strip_set_pixel_hsv(strip, j, primaryColor, 255, 255);
+        for (int j = i + 4; j < i + 8; j++) {
+          actual_led_strip_set_pixel_hsv(strip, j, primaryHue);
         }
       }
-      uint16_t temp = primaryColor;
-      primaryColor = secondaryColor;
-      secondaryColor = temp;
-      led_strip_refresh(strip);
-      delay(333);
+      uint16_t temp = primaryHue;
+      primaryHue = secondaryHue;
+      secondaryHue = temp;
     }
 
     zeroIsPrimaryHue = !zeroIsPrimaryHue;
   }
 
   int getDelay() {
-    return 25;
+    return 50;
   }
 
   int tag() override { return 1000; }
-  int minIterations() override { return 1; }
-  int maxIterations() override { return 2; }
+  int minIterations() override { return 2; }
+  int maxIterations() override { return 3; }
 
 private:
   bool zeroIsPrimaryHue;
-  bool changeHueEachLoop;
   bool fullRandom;
   uint16_t primaryHue;
+  uint16_t secondaryHue;
 };
 
 #endif

@@ -11,7 +11,7 @@
 // my stuff
 #include "Constants.h"
 // #include "Blinkvolution.hpp"
-// #include "BlinkComplement.hpp"
+#include "BlinkComplement.hpp"
 #include "Bounce.hpp"
 #include "DropIn.hpp"
 #include "DropOff.hpp"
@@ -44,8 +44,8 @@ DropOff dropOffForward(led_strip, true);
 DropOff dropOffBackwards(led_strip, false);
 FillIn fillInForward(led_strip, true);
 FillIn fillInBackwards(led_strip, false);
-// BlinkComplement blinkComplementRandomHueConsistently(led_strip, false, true, true);
-// BlinkComplement blinkComplementRandomHueDifferently(led_strip, true, true, true);
+BlinkComplement blinkComplementDefinedColors(led_strip, false);
+BlinkComplement blinkComplementAllHues(led_strip, true);
 Bounce bounce(led_strip);
 Twinkle twinkle(led_strip);
 
@@ -58,8 +58,8 @@ Animation* animations[] = {
   &dropOffForward, // 5
   &fillInForward, // 6
   &fillInBackwards, // 7
-  // &blinkComplementRandomHueConsistently,
-  // &blinkComplementRandomHueDifferently,
+  &blinkComplementDefinedColors,
+  &blinkComplementAllHues,
   &bounce, // 8
   &twinkle, // 9
   &multiRainbowForwards, // 10
@@ -96,7 +96,7 @@ void basic_blink(void) {
 }
 
 void single(void) {
-  auto animation = fullRainbowForward;
+  auto animation = blinkComplementDefinedColors;
   ESP_LOGI("animation", "Starting %s!", __FUNCTION__);
   animation.setup();
 
