@@ -1,24 +1,31 @@
-#ifndef FULLRAINBOW_HPP
-#define FULLRAINBOW_HPP
+#ifndef MULTIRAINBOW_HPP
+#define MULTIRAINBOW_HPP
 
 #include "led_strip.h"
 #include "Constants.h"
 #include "Animation.hpp"
 #include "actual_led_strip_set_pixel_hsv.h"
+#include "esp_random_max.h"
+#include "esp_log.h"
 
-class FullRainbow : public Animation {
+class MultiRainbow : public Animation {
 public:
-    FullRainbow(led_strip_handle_t& strip, bool direction)
+    MultiRainbow(led_strip_handle_t& strip, bool direction)
         : Animation(strip), adding(direction), hues(new uint16_t[NUM_PIXELS]) {}
 
-    ~FullRainbow() {
+    ~MultiRainbow() {
         delete[] hues;
     }
 
     void setup() override {
-        uint16_t slice = HUE_MAX / NUM_PIXELS;
-        for (int i = 0; i < NUM_PIXELS; i++) {
-            hues[i] = slice * i;
+        int numberOfRainbows = esp_random_max(5) + 1; // max 6 min 1
+        int numberOfLEDsPerRainbow = NUM_PIXELS / numberOfRainbows;
+        uint16_t slice = HUE_MAX / numberOfLEDsPerRainbow;
+        for (int i = 0; i < numberOfRainbows; i++) {
+            int offset = i * numberOfLEDsPerRainbow;
+            for (int j = 0; j < numberOfLEDsPerRainbow; j++) {
+                hues[j + offset] = slice * j;
+            }
         }
     }
 
@@ -35,10 +42,10 @@ public:
 
     int minIterations() override { return 2; }
     int maxIterations() override { return 4; }
-    int tag() override { return 1008; }
+    int tag() override { return 1011; }
 
     int getDelay() {
-        return 10;
+        return 5;
     }
 
 private:

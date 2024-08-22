@@ -4,6 +4,7 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "bootloader_random.h"
 #include "led_strip.h"
 #include "sdkconfig.h"
 
@@ -16,6 +17,7 @@
 #include "DropOff.hpp"
 #include "FillIn.hpp"
 #include "FlashWhite.hpp"
+#include "MultiRainbow.hpp"
 #include "RainbowDichromatic.hpp"
 #include "RainbowFull.hpp"
 #include "RainbowSingleColorSlice.hpp"
@@ -36,6 +38,8 @@ RainbowSingleColorSlice rainbowSliceForward(led_strip, true);
 RainbowSingleColorSlice rainbowSliceBackward(led_strip, false);
 RainbowDichromatic rainbowDichromaticForwards(led_strip, true);
 RainbowDichromatic rainbowDichromaticBackwards(led_strip, false);
+MultiRainbow multiRainbowForwards(led_strip, true);
+MultiRainbow multiRainbowBackwards(led_strip, false);
 DropIn dropInForward(led_strip, true);
 DropIn dropInBackwards(led_strip, false);
 DropOff dropOffForward(led_strip, true);
@@ -60,6 +64,8 @@ Animation* animations[] = {
   // &blinkComplementRandomHueDifferently,
   &bounce, // 8
   &twinkle, // 9
+  &multiRainbowForwards, // 10
+  &multiRainbowBackwards, // 11
 };
 
 static void configure_led(void) {
@@ -91,8 +97,8 @@ void basic_blink(void) {
   }
 }
 
-void rainbow(void) {
-  auto animation = fillInBackwards;
+void single(void) {
+  auto animation = fullRainbowForward;
   ESP_LOGI("animation", "Starting %s!", __FUNCTION__);
   animation.setup();
 
@@ -124,7 +130,7 @@ void randomlySelect(void) {
   ESP_LOGI("animation", "Starting %s", __FUNCTION__);
 
   int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
-  int actualAnimationIndex = 4; // esp_random_max(numberOfAnimations + 1) - 1;
+  int actualAnimationIndex = esp_random_max(numberOfAnimations + 1) - 1;
   ESP_LOGI("animation", "Picking %d of %d (tag %d)", actualAnimationIndex, numberOfAnimations, animations[actualAnimationIndex]->tag());
   animations[actualAnimationIndex]->setup();
 
@@ -148,7 +154,7 @@ extern "C" void app_main(void) {
   configure_led();
   while (1) {
     // basic_blink();
-    // rainbow();
+    // single();
     // inOrder();
     randomlySelect();
   }
