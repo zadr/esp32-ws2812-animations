@@ -24,7 +24,7 @@ public:
   }
 
   int steps() override {
-    return 432;
+    return 216;
   }
 
   int minIterations() override { return 2; }
@@ -67,7 +67,7 @@ public:
   }
 
   int getDelay() override {
-    return 10;
+    return 45;
   }
 
 private:
