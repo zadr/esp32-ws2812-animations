@@ -10,15 +10,15 @@
 
 // my stuff
 #include "Constants.h"
-#include "Blinkvolution.hpp"
-#include "BlinkComplement.hpp"
+// #include "Blinkvolution.hpp"
+// #include "BlinkComplement.hpp"
 #include "Bounce.hpp"
 #include "DropIn.hpp"
 #include "DropOff.hpp"
 #include "FillIn.hpp"
 #include "FlashWhite.hpp"
 #include "MultiRainbow.hpp"
-#include "RainbowDichromatic.hpp"
+// #include "RainbowDichromatic.hpp"
 #include "RainbowFull.hpp"
 #include "RainbowSingleColorSlice.hpp"
 #include "RainbowDichromatic.hpp"
@@ -36,8 +36,6 @@ FullRainbow fullRainbowForward(led_strip, true);
 FullRainbow fullRainbowBackward(led_strip, false);
 RainbowSingleColorSlice rainbowSliceForward(led_strip, true);
 RainbowSingleColorSlice rainbowSliceBackward(led_strip, false);
-RainbowDichromatic rainbowDichromaticForwards(led_strip, true);
-RainbowDichromatic rainbowDichromaticBackwards(led_strip, false);
 MultiRainbow multiRainbowForwards(led_strip, true);
 MultiRainbow multiRainbowBackwards(led_strip, false);
 DropIn dropInForward(led_strip, true);
@@ -46,8 +44,8 @@ DropOff dropOffForward(led_strip, true);
 DropOff dropOffBackwards(led_strip, false);
 FillIn fillInForward(led_strip, true);
 FillIn fillInBackwards(led_strip, false);
-BlinkComplement blinkComplementRandomHueConsistently(led_strip, false, true, true);
-BlinkComplement blinkComplementRandomHueDifferently(led_strip, true, true, true);
+// BlinkComplement blinkComplementRandomHueConsistently(led_strip, false, true, true);
+// BlinkComplement blinkComplementRandomHueDifferently(led_strip, true, true, true);
 Bounce bounce(led_strip);
 Twinkle twinkle(led_strip);
 

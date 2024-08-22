@@ -38,7 +38,7 @@ public:
     int tag() override { return 1008; }
 
     int getDelay() {
-        return 10;
+        return 15;
     }
 
 private:
