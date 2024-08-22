@@ -1,14 +1,16 @@
 // esp32 stuff
-#include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "bootloader_random.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
-#include "bootloader_random.h"
-#include "led_strip.h"
+#include "esp_wifi.h"
 #include "sdkconfig.h"
 
-// my stuff
+// idf libraries
+#include "led_strip.h"
+
+// my animations
 #include "Constants.h"
 // #include "Blinkvolution.hpp"
 #include "BlinkComplement.hpp"
@@ -24,6 +26,7 @@
 #include "RainbowDichromatic.hpp"
 #include "Twinkle.hpp"
 
+// my helper functions
 #include "esp_random_max.h"
 
 static uint8_t s_led_state = 0;
@@ -149,6 +152,8 @@ void randomlySelect(void) {
 }
 
 extern "C" void app_main(void) {
+  esp_wifi_stop();
+
   // wifi / ble not used, so pull rng from other entropy sources
   // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/random.html
   bootloader_random_enable();
