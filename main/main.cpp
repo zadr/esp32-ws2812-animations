@@ -151,6 +151,10 @@ void randomlySelect(void) {
 }
 
 extern "C" void app_main(void) {
+  // wifi / ble not used, so pull rng from other entropy sources
+  // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/random.html
+  bootloader_random_enable();
+
   configure_led();
   while (1) {
     // basic_blink();
