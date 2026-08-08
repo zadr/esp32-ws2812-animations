@@ -12,9 +12,12 @@ public:
   }
   ~FillIn() {}
 
+  // One step short of the first pixel at either end, so the first loop() lands
+  // on it the same way a band change does.
   void setup() {
-    currentStep = forward ? 0 : NUM_PIXELS;
+    currentStep = forward ? -1 : NUM_PIXELS;
     hueIndex = forward ? 0 : 6;
+    beginBand();
   }
 
   int steps() {
@@ -22,45 +25,19 @@ public:
   }
 
   void loop() {
-    int oldHueIndex = hueIndex;
     if (forward) {
       currentStep += 1;
       if (currentStep >= NUM_PIXELS) {
         currentStep = 0;
         hueIndex += 1;
+        beginBand();
       }
     } else {
       currentStep -= 1;
       if (currentStep < 0) {
-        currentStep = NUM_PIXELS;
+        currentStep = NUM_PIXELS - 1;
         hueIndex -= 1;
-      }
-    }
-    int newHueIndex = hueIndex;
-
-    if (newHueIndex != oldHueIndex) {
-      switch (hueIndex) {
-      case 0:
-        activeHue = drift(HUE_RED, esp_random_max(30));
-        break;
-      case 1:
-        activeHue = drift(HUE_ORANGE, esp_random_max(30));
-        break;
-      case 2:
-        activeHue = drift(HUE_YELLOW, esp_random_max(30));
-        break;
-      case 3:
-        activeHue = drift(HUE_GREEN, esp_random_max(30));
-        break;
-      case 4:
-        activeHue = drift(HUE_BLUE, esp_random_max(30));
-        break;
-      case 5:
-        activeHue = drift(HUE_INDIGO, esp_random_max(30));
-        break;
-      case 6:
-        activeHue = drift(HUE_VIOLET, esp_random_max(30));
-        break;
+        beginBand();
       }
     }
     actual_led_strip_set_pixel_hsv(strip, currentStep, activeHue);
@@ -75,6 +52,32 @@ public:
   int tag() override { return 1005; }
 
 private:
+  void beginBand() {
+    switch (hueIndex) {
+    case 0:
+      activeHue = drift(HUE_RED, esp_random_max(30));
+      break;
+    case 1:
+      activeHue = drift(HUE_ORANGE, esp_random_max(30));
+      break;
+    case 2:
+      activeHue = drift(HUE_YELLOW, esp_random_max(30));
+      break;
+    case 3:
+      activeHue = drift(HUE_GREEN, esp_random_max(30));
+      break;
+    case 4:
+      activeHue = drift(HUE_BLUE, esp_random_max(30));
+      break;
+    case 5:
+      activeHue = drift(HUE_INDIGO, esp_random_max(30));
+      break;
+    case 6:
+      activeHue = drift(HUE_VIOLET, esp_random_max(30));
+      break;
+    }
+  }
+
     int currentStep;
     int hueIndex;
     int activeHue;
