@@ -25,8 +25,12 @@
 #define HUE_INDIGO 45056 // 247.5deg, nominal 260
 #define HUE_VIOLET 53081 // 291.6deg, nominal 280
 
-// constrain complementary colors to the range of hues we have available
-#define COMPLEMENT(hue) (((hue) + 24576) % 49152)
+// Complements fold into the tuned span rather than around the full circle,
+// since nothing above violet has been measured on this strip. Violet is the top
+// of that span, so the width follows the palette and does not need revisiting
+// when a hue is retuned. Even width, so a complement of a complement is exact.
+#define HUE_SPAN (HUE_VIOLET + 1)
+#define COMPLEMENT(hue) (((hue) + HUE_SPAN / 2) % HUE_SPAN)
 #define delay(time) vTaskDelay(time / portTICK_PERIOD_MS);
 
 #endif
