@@ -3,9 +3,9 @@
 
 #include "Animation.hpp"
 #include "Constants.h"
+#include "esp_random.h"
 #include "esp_random_max.h"
 #include "actual_led_strip_set_pixel_hsv.h"
-#include "freertos/task.h"
 
 class Bounce : public Animation {
 public:

@@ -1,7 +1,7 @@
 #ifndef COLOR_UTILS_HPP
 #define COLOR_UTILS_HPP
 
-#include "esp_random_max.h"
+#include "esp_random.h"
 #include "Constants.h"
 
 // Hue is a full 16-bit wheel, so the narrowing conversion is the wrap: an

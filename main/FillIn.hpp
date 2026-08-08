@@ -4,6 +4,8 @@
 #include "Animation.hpp"
 #include "Constants.h"
 #include "actual_led_strip_set_pixel_hsv.h"
+#include "color_utils.hpp"
+#include "esp_random_max.h"
 
 class FillIn : public Animation {
 public:

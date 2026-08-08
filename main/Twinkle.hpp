@@ -6,8 +6,6 @@
 #include "actual_led_strip_set_pixel_hsv.h"
 #include "color_utils.hpp"
 #include "esp_random_max.h"
-#include "freertos/task.h"
-#include <math.h>
 #include <vector>
 
 class Twinkle : public Animation {
