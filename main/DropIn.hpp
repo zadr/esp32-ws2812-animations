@@ -48,7 +48,10 @@ public:
       break;
     }
 
-    int amount = (NUM_PIXELS / 144) * 2;
+    // Chunk scales with strip length but never reaches zero, which on a short
+    // strip would make the loops below stop advancing.
+    int amount = NUM_PIXELS / 72;
+    if (amount < 1) amount = 1;
     for (uint16_t i = 0; i < NUM_PIXELS; i += amount) {
         led_strip_clear(strip);
         for (int16_t j = NUM_PIXELS - 1; j >= i; j -= amount) {
