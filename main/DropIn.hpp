@@ -10,68 +10,54 @@
 class DropIn : public Animation {
 public:
   DropIn(led_strip_handle_t& ws2812b, bool forward)
-    : Animation(ws2812b), currentStep(0), currentTarget(0), hueIndex(0), forward(forward) {
+    : Animation(ws2812b), currentStep(0), currentTarget(0), hueIndex(0), forward(forward),
+      landed(0), falling(0), activeHue(0) {
   }
   ~DropIn() {}
 
   void setup() {
     hueIndex = forward ? 0 : 6;
+    landed = 0;
+    falling = NUM_PIXELS - 1;
+    activeHue = pickHue();
   }
 
   int steps() {
-    return 7;
+    int frames = 0;
+    for (int16_t rest = 0; rest < NUM_PIXELS; rest += chunk()) {
+      frames += (NUM_PIXELS - 1 - rest) / chunk() + 1;
+    }
+    return frames * 7;
   }
 
   void loop() {
-    int hueToDrop = 0;
-    switch (hueIndex) {
-    case 0:
-      hueToDrop = drift(HUE_RED, esp_random_max(30));
-      break;
-    case 1:
-      hueToDrop = drift(HUE_ORANGE, esp_random_max(30));
-      break;
-    case 2:
-      hueToDrop = drift(HUE_YELLOW, esp_random_max(30));
-      break;
-    case 3:
-      hueToDrop = drift(HUE_GREEN, esp_random_max(30));
-      break;
-    case 4:
-      hueToDrop = drift(HUE_BLUE, esp_random_max(30));
-      break;
-    case 5:
-      hueToDrop = drift(HUE_INDIGO, esp_random_max(30));
-      break;
-    case 6:
-      hueToDrop = drift(HUE_VIOLET, esp_random_max(30));
-      break;
+    // A sweep leaves its trail lit, so the strip only clears where one begins.
+    if (falling == NUM_PIXELS - 1) {
+      led_strip_clear(strip);
     }
 
-    // Chunk scales with strip length but never reaches zero, which on a short
-    // strip would make the loops below stop advancing.
-    int amount = NUM_PIXELS / 72;
-    if (amount < 1) amount = 1;
-    for (uint16_t i = 0; i < NUM_PIXELS; i += amount) {
-        led_strip_clear(strip);
-        for (int16_t j = NUM_PIXELS - 1; j >= i; j -= amount) {
-            actual_led_strip_set_pixel_hsv(strip, j, hueToDrop);
+    actual_led_strip_set_pixel_hsv(strip, falling, activeHue);
 
-            for (int16_t k = 0; k < amount; k++) {
-                if (j - k >= 0) {
-                    actual_led_strip_set_pixel_hsv(strip, j - k, hueToDrop);
-                }
-            }
-
-            for (uint16_t m = 0; m < i; m++) {
-                actual_led_strip_set_pixel_hsv(strip, m, hueToDrop);
-            }
-
-            led_strip_refresh(strip);
-            delay(getDelay());
-        }
+    for (int16_t k = 0; k < chunk(); k++) {
+      if (falling - k >= 0) {
+        actual_led_strip_set_pixel_hsv(strip, falling - k, activeHue);
+      }
     }
-    hueIndex += forward ? 1 : -1;
+
+    for (int16_t m = 0; m < landed; m++) {
+      actual_led_strip_set_pixel_hsv(strip, m, activeHue);
+    }
+
+    falling -= chunk();
+    if (falling < landed) {
+      falling = NUM_PIXELS - 1;
+      landed += chunk();
+      if (landed >= NUM_PIXELS) {
+        landed = 0;
+        hueIndex += forward ? 1 : -1;
+        activeHue = pickHue();
+      }
+    }
   }
 
   int getDelay() {
@@ -84,10 +70,40 @@ public:
   int maxIterations() override { return 3; }
 
 private:
+    // Chunk scales with strip length but never reaches zero, which on a short
+    // strip would make the sweep stop advancing.
+    int chunk() {
+      int amount = NUM_PIXELS / 72;
+      return amount < 1 ? 1 : amount;
+    }
+
+    int pickHue() {
+      switch (hueIndex) {
+      case 0:
+        return drift(HUE_RED, esp_random_max(30));
+      case 1:
+        return drift(HUE_ORANGE, esp_random_max(30));
+      case 2:
+        return drift(HUE_YELLOW, esp_random_max(30));
+      case 3:
+        return drift(HUE_GREEN, esp_random_max(30));
+      case 4:
+        return drift(HUE_BLUE, esp_random_max(30));
+      case 5:
+        return drift(HUE_INDIGO, esp_random_max(30));
+      case 6:
+        return drift(HUE_VIOLET, esp_random_max(30));
+      }
+      return 0;
+    }
+
     int currentStep;
     int currentTarget;
     int hueIndex;
     bool forward;
+    int16_t landed;
+    int16_t falling;
+    int activeHue;
 };
 
 #endif
