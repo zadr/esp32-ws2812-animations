@@ -42,12 +42,12 @@ public:
     if (pos == NUM_PIXELS - 1 || pos == 0) {
       direction = -direction;
 
-      // Drift the hue slightly after each bounce
-      int16_t drift = esp_random_max(30);
+      // Drift the hue slightly after each bounce, wrapping around the wheel
+      int32_t drift = (esp_random_max(30) / 100.0) * HUE_MAX;
       if (esp_random() % 2 == 0) {
-        drift *= -1;
+        drift = -drift;
       }
-      hue += (drift / 100.0) * HUE_MAX;
+      hue = (uint16_t)(hue + drift);
     }
   }
 
