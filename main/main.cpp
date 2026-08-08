@@ -28,7 +28,6 @@
 // my helper functions
 #include "esp_random_max.h"
 
-static uint8_t s_led_state = 0;
 static led_strip_handle_t led_strip;
 
 // animation inits
@@ -93,23 +92,6 @@ static void configure_led(void) {
 
   ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
   led_strip_clear(led_strip);
-}
-
-void basic_blink(void) {
-  while (1) {
-    if (s_led_state) {
-      for (int i = 0; i < NUM_PIXELS; i++) {
-        led_strip_set_pixel(led_strip, i, 80, 16, 16);
-      }
-    } else {
-      for (int i = 0; i < NUM_PIXELS; i++) {
-        led_strip_set_pixel(led_strip, i, 16, 16, 80);
-      }
-    }
-    led_strip_refresh(led_strip);
-    s_led_state = !s_led_state;
-    delay(CONFIG_BLINK_PERIOD);
-  }
 }
 
 void single(void) {
@@ -181,7 +163,6 @@ extern "C" void app_main(void) {
 
   configure_led();
   while (1) {
-    // basic_blink();
     // single();
     // inOrder();
     randomlySelect();
