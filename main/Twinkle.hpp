@@ -44,15 +44,17 @@ public:
       }
     }
 
-    // Twinkle random LEDs with complementary hues, ensuring no more than 36 are active
-    while (twinkleCount < 36) {
-      uint16_t index = esp_random_max(NUM_PIXELS);
+    // Density rather than a fixed count: 36 of the original 432 pixels. A fixed
+    // 36 on a short strip lights most of it at once and reads as noise.
+    const int maxTwinkles = NUM_PIXELS / 12 > 0 ? NUM_PIXELS / 12 : 1;
+    while (twinkleCount < maxTwinkles) {
+      uint16_t index = esp_random_max(NUM_PIXELS - 1);
       while (
         twinkleDurations[index] > 0 && // make sure we don't turn a light thats on back on again
         (index > 0 && twinkleDurations[index - 1] > 0) && // make sure we don't turn a light on next to another light that's on
         (index < NUM_PIXELS - 1 && twinkleDurations[index + 1] > 0) // make sure we don't turn a light on next to another light that's on
       ) {
-        index = esp_random_max(NUM_PIXELS);
+        index = esp_random_max(NUM_PIXELS - 1);
       }
 
       // Set a random duration for the twinkle (between 3 and 15 loops)
