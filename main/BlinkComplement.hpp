@@ -55,12 +55,20 @@ public:
   }
 
   void loop() {
-    for (int i = 0; i < NUM_PIXELS; i += 8) {
-      for (int j = i; j < i + 4; j++) {
-        actual_led_strip_set_pixel_hsv(strip, j, secondaryHue);
-      }
-      for (int j = i + 4; j < i + 8; j++) {
-        actual_led_strip_set_pixel_hsv(strip, j, primaryHue);
+    // Nominally 4 secondary then 4 primary, but the count of alternations is
+    // taken from the strip and the bands stretch to fill it, so a strip that 8
+    // does not divide gets slightly wider bands rather than a short one at the
+    // end. Whole pairs keep the two hues on equal footing across the swap.
+    const int pairs = NUM_PIXELS / 8 > 0 ? NUM_PIXELS / 8 : 1;
+    const int bands = pairs * 2;
+
+    for (int band = 0; band < bands; band++) {
+      const int begin = (band * NUM_PIXELS) / bands;
+      const int end = ((band + 1) * NUM_PIXELS) / bands;
+      const uint16_t hue = band % 2 == 0 ? secondaryHue : primaryHue;
+
+      for (int j = begin; j < end; j++) {
+        actual_led_strip_set_pixel_hsv(strip, j, hue);
       }
     }
 
