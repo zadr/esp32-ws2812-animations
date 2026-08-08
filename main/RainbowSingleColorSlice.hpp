@@ -9,11 +9,7 @@
 class RainbowSingleColorSlice : public Animation {
 public:
     RainbowSingleColorSlice(led_strip_handle_t& strip, bool direction)
-        : Animation(strip), adding(direction), hues(new uint16_t[NUM_PIXELS]) {}
-
-    ~RainbowSingleColorSlice() {
-        delete[] hues;
-    }
+        : Animation(strip), adding(direction) {}
 
     void setup() override {
         for (int i = 0; i < NUM_PIXELS; i++) {
@@ -42,7 +38,7 @@ public:
 
 private:
     bool adding;
-    uint16_t* hues;
+    uint16_t hues[NUM_PIXELS];
 };
 
 #endif

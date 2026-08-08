@@ -11,11 +11,7 @@
 class MultiRainbow : public Animation {
 public:
     MultiRainbow(led_strip_handle_t& strip, bool direction)
-        : Animation(strip), adding(direction), hues(new uint16_t[NUM_PIXELS]) {}
-
-    ~MultiRainbow() {
-        delete[] hues;
-    }
+        : Animation(strip), adding(direction) {}
 
     void setup() override {
         int numberOfRainbows = esp_random_max(4) + 2; // inclusive, so 2 through 6
@@ -56,7 +52,7 @@ public:
 
 private:
     bool adding;
-    uint16_t* hues;
+    uint16_t hues[NUM_PIXELS];
 };
 
 #endif

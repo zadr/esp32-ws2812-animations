@@ -9,11 +9,7 @@
 class FullRainbow : public Animation {
 public:
     FullRainbow(led_strip_handle_t& strip, bool direction)
-        : Animation(strip), adding(direction), hues(new uint16_t[NUM_PIXELS]) {}
-
-    ~FullRainbow() {
-        delete[] hues;
-    }
+        : Animation(strip), adding(direction) {}
 
     void setup() override {
         uint16_t slice = HUE_MAX / NUM_PIXELS;
@@ -44,7 +40,7 @@ public:
 
 private:
     bool adding;
-    uint16_t* hues;
+    uint16_t hues[NUM_PIXELS];
 };
 
 #endif
