@@ -53,23 +53,30 @@ BlinkComplement blinkComplementAllHuesEvolution(led_strip, true, true);
 Bounce bounce(led_strip);
 Twinkle twinkle(led_strip);
 
-Animation* animations[] = {
-  &fullRainbowForward, // 0
-  &fullRainbowBackward, // 1
-  &rainbowSliceForward, // 2
-  &rainbowSliceBackward, // 3
-  &dropInForward, // 4
-  &dropOffForward, // 5
-  &fillInForward, // 6
-  &fillInBackwards, // 7
-  &blinkComplementDefinedColors, // 8
-  &blinkComplementAllHues, // 9
-  &bounce, // 10
-  &twinkle, // 11
-  &multiRainbowForwards, // 12
-  &multiRainbowBackwards, // 13
-  &blinkComplementDefinedColorsEvolution, // 14
-  &blinkComplementAllHuesEvolution, // 15
+// Named here rather than on Animation, since direction and the BlinkComplement
+// flags distinguish entries that share a class.
+struct Entry {
+  Animation* animation;
+  const char* name;
+};
+
+Entry animations[] = {
+  {&fullRainbowForward, "full rainbow fwd"},
+  {&fullRainbowBackward, "full rainbow rev"},
+  {&rainbowSliceForward, "rainbow slice fwd"},
+  {&rainbowSliceBackward, "rainbow slice rev"},
+  {&dropInForward, "drop in"},
+  {&dropOffForward, "drop off"},
+  {&fillInForward, "fill in fwd"},
+  {&fillInBackwards, "fill in rev"},
+  {&blinkComplementDefinedColors, "blink complement, palette"},
+  {&blinkComplementAllHues, "blink complement, all hues"},
+  {&bounce, "bounce"},
+  {&twinkle, "twinkle"},
+  {&multiRainbowForwards, "multi rainbow fwd"},
+  {&multiRainbowBackwards, "multi rainbow rev"},
+  {&blinkComplementDefinedColorsEvolution, "blink complement, palette, evolving"},
+  {&blinkComplementAllHuesEvolution, "blink complement, all hues, evolving"},
 };
 
 static void configure_led(void) {
@@ -123,13 +130,14 @@ void inOrder(void) {
 
   int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
   for (int i = 0; i < numberOfAnimations; i++) {
-    animations[i]->setup();
+    ESP_LOGI("animation", "Starting %s", animations[i].name);
+    animations[i].animation->setup();
 
-    int numberOfSteps = animations[i]->steps();
+    int numberOfSteps = animations[i].animation->steps();
     for (int step = 0; step < numberOfSteps; step++) {
-      animations[i]->loop();
+      animations[i].animation->loop();
       led_strip_refresh(led_strip);
-      delay(animations[i]->getDelay());
+      delay(animations[i].animation->getDelay());
     }
   }
 }
@@ -139,21 +147,24 @@ void randomlySelect(void) {
 
   int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
   int actualAnimationIndex = esp_random_max(numberOfAnimations - 1);
-  ESP_LOGI("animation", "Picking %d of %d (tag %d)", actualAnimationIndex, numberOfAnimations, animations[actualAnimationIndex]->tag());
-  animations[actualAnimationIndex]->setup();
+  Animation* animation = animations[actualAnimationIndex].animation;
+  const char* name = animations[actualAnimationIndex].name;
 
-  int numberOfSteps = animations[actualAnimationIndex]->steps();
+  ESP_LOGI("animation", "Picking %s, %d of %d", name, actualAnimationIndex, numberOfAnimations);
+  animation->setup();
+
+  int numberOfSteps = animation->steps();
 
   // repeat a few times to look good
-  int range = animations[actualAnimationIndex]->maxIterations() - animations[actualAnimationIndex]->minIterations();
-  int repetitionCount = esp_random_max(range) + animations[actualAnimationIndex]->minIterations();
+  int range = animation->maxIterations() - animation->minIterations();
+  int repetitionCount = esp_random_max(range) + animation->minIterations();
   if (repetitionCount > 6) { repetitionCount = 6; }
   // for (int i = 0; i < repetitionCount; i++) {
     for (int step = 0; step < numberOfSteps; step++) {
-      ESP_LOGI("animation", "Looping %s step %d", __FUNCTION__, step);
-      animations[actualAnimationIndex]->loop();
+      ESP_LOGI("animation", "Looping %s step %d of %d", name, step, numberOfSteps);
+      animation->loop();
       led_strip_refresh(led_strip);
-      delay(animations[actualAnimationIndex]->getDelay());
+      delay(animation->getDelay());
     }
   // }
 }
