@@ -13,6 +13,7 @@
 #include "Constants.h"
 #include "BlinkComplement.hpp"
 #include "Bounce.hpp"
+#include "CellularAutomaton.hpp"
 #include "DropIn.hpp"
 #include "DropOff.hpp"
 #include "FillIn.hpp"
@@ -50,6 +51,8 @@ BlinkComplement blinkComplementDefinedColorsEvolution(led_strip, false, true);
 BlinkComplement blinkComplementAllHuesEvolution(led_strip, true, true);
 Bounce bounce(led_strip);
 Twinkle twinkle(led_strip);
+CellularAutomaton rule30(led_strip, 30);
+CellularAutomaton rule110(led_strip, 110);
 
 // Named here rather than on Animation, since direction and the BlinkComplement
 // flags distinguish entries that share a class.
@@ -75,6 +78,8 @@ Entry animations[] = {
   {&multiRainbowBackwards, "multi rainbow rev"},
   {&blinkComplementDefinedColorsEvolution, "blink complement, palette, evolving"},
   {&blinkComplementAllHuesEvolution, "blink complement, all hues, evolving"},
+  {&rule30, "rule 30"},
+  {&rule110, "rule 110"},
 };
 
 static void configure_led(void) {
