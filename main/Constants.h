@@ -5,9 +5,13 @@
 #define NUM_PIXELS 50
 #define HUE_MAX 65535
 
-// WS2812B dies do not dim evenly, so this shifts perceived hue rather than just
-// output. The palette below was judged at full brightness.
-#define BRIGHTNESS_SCALE 0.33
+#define BRIGHTNESS_SCALE 0.66
+
+// Red reads dimmer than green and blue as overall output falls, so scaling all
+// three together pulls the hue out of every mix that leans on red. Exponent
+// below 1 decays red more slowly. Full output is a fixed point, so the palette
+// is tuned there and this only governs the way down.
+#define RED_RESPONSE 0.54
 
 // Spaced by eye against this strip, not by angle; the trailing figure is where
 // the arithmetic would have put each. Green is the strong die, so yellow lands
