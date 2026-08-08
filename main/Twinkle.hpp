@@ -16,7 +16,6 @@ public:
     : Animation(strip), backgroundHue(0) {
       // Initialize the twinkle durations vector with 0s
       twinkleDurations.resize(NUM_PIXELS, 0);
-      twinkleCount = 0;
     }
 
   void setup() override {
@@ -48,13 +47,9 @@ public:
     // 36 on a short strip lights most of it at once and reads as noise.
     const int maxTwinkles = NUM_PIXELS / 12 > 0 ? NUM_PIXELS / 12 : 1;
     while (twinkleCount < maxTwinkles) {
-      uint16_t index = esp_random_max(NUM_PIXELS - 1);
-      while (
-        twinkleDurations[index] > 0 && // make sure we don't turn a light thats on back on again
-        (index > 0 && twinkleDurations[index - 1] > 0) && // make sure we don't turn a light on next to another light that's on
-        (index < NUM_PIXELS - 1 && twinkleDurations[index + 1] > 0) // make sure we don't turn a light on next to another light that's on
-      ) {
-        index = esp_random_max(NUM_PIXELS - 1);
+      int index = pickTwinkleIndex();
+      if (index < 0) {
+        break;
       }
 
       // Set a random duration for the twinkle (between 3 and 15 loops)
@@ -73,9 +68,34 @@ public:
   }
 
 private:
+  bool canTwinkle(uint16_t index) const {
+    if (twinkleDurations[index] > 0) {
+      return false;
+    }
+    if (index > 0 && twinkleDurations[index - 1] > 0) {
+      return false;
+    }
+    if (index < NUM_PIXELS - 1 && twinkleDurations[index + 1] > 0) {
+      return false;
+    }
+    return true;
+  }
+
+  // Random start then walk the strip, so a strip with no legal slot left
+  // reports -1 instead of rerolling forever.
+  int pickTwinkleIndex() const {
+    uint16_t start = esp_random_max(NUM_PIXELS - 1);
+    for (uint16_t offset = 0; offset < NUM_PIXELS; offset++) {
+      uint16_t index = (start + offset) % NUM_PIXELS;
+      if (canTwinkle(index)) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
   uint16_t backgroundHue;
   std::vector<int> twinkleDurations; // Stores the remaining duration for each twinkling LED
-  int twinkleCount;
 };
 
 #endif
