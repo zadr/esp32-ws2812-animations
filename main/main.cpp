@@ -138,7 +138,7 @@ void randomlySelect(void) {
   ESP_LOGI("animation", "Starting %s", __FUNCTION__);
 
   int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
-  int actualAnimationIndex = esp_random_max(numberOfAnimations + 1) - 1;
+  int actualAnimationIndex = esp_random_max(numberOfAnimations - 1);
   ESP_LOGI("animation", "Picking %d of %d (tag %d)", actualAnimationIndex, numberOfAnimations, animations[actualAnimationIndex]->tag());
   animations[actualAnimationIndex]->setup();
 
