@@ -21,6 +21,13 @@ public:
         int numberOfRainbows = esp_random_max(4) + 2; // max 7 min 2
         int numberOfLEDsPerRainbow = NUM_PIXELS / numberOfRainbows;
         uint16_t slice = HUE_MAX / numberOfLEDsPerRainbow;
+
+        // Integer division leaves a remainder of pixels past the last full
+        // rainbow; without this they render whatever the heap held.
+        for (int i = 0; i < NUM_PIXELS; i++) {
+            hues[i] = 0;
+        }
+
         for (int i = 0; i < numberOfRainbows; i++) {
             int offset = i * numberOfLEDsPerRainbow;
             for (int j = 0; j < numberOfLEDsPerRainbow; j++) {
