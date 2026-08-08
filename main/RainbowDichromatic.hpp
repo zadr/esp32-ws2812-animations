@@ -4,6 +4,7 @@
 #include "led_strip.h"
 #include "Constants.h"
 #include "Animation.hpp"
+#include "actual_led_strip_set_pixel_hsv.h"
 
 class RainbowDichromatic : public Animation {
 public:
@@ -69,7 +70,7 @@ private:
 
     void animate() {
         for (int i = 0; i < NUM_PIXELS; i++) {
-            led_strip_set_pixel_hsv(strip, i, hues[i], 255, 255);
+            actual_led_strip_set_pixel_hsv(strip, i, hues[i]);
         }
 
         shiftHues();
