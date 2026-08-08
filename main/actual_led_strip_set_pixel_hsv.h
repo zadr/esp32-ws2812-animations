@@ -3,6 +3,7 @@
 
 #include "led_strip.h"
 #include "esp_log.h"
+#include "Constants.h"
 
 static void hue_to_rgb(uint16_t h, uint32_t &r, uint32_t &g, uint32_t &b) {
     float p, q, t, ff;
@@ -45,10 +46,15 @@ static void hue_to_rgb(uint16_t h, uint32_t &r, uint32_t &g, uint32_t &b) {
     }
 }
 
+// Several animations step in fixed blocks that overrun a strip length not
+// divisible by the block size, so the bound is enforced here rather than in
+// each of them.
 static void actual_led_strip_set_pixel_hsv(led_strip_handle_t strip, uint32_t index, uint16_t hue) {
+  if (index >= NUM_PIXELS) return;
+
   uint32_t r = 0; uint32_t g = 0; uint32_t b = 0;
   hue_to_rgb(hue, r, g, b);
-  led_strip_set_pixel(strip, index, (r * 0.33), (g * 0.33), (b * 0.33)); // 33% to reduce brightness
+  led_strip_set_pixel(strip, index, (r * BRIGHTNESS_SCALE), (g * BRIGHTNESS_SCALE), (b * BRIGHTNESS_SCALE));
 }
 
 #endif
