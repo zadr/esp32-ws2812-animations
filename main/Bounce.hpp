@@ -27,14 +27,22 @@ public:
       actual_led_strip_set_pixel_hsv(strip, i, compHue);
     }
 
-    // Light the current LED and create a tail effect with hue fading
-    for (int16_t tail = 0; tail < 16; tail++) {
+    // Proportion rather than a fixed length: 16 of the original 432 pixels. Two
+    // is the shortest that still fades, and below that the head reads as a dot.
+    const int16_t tailLength = NUM_PIXELS / 27 > 2 ? NUM_PIXELS / 27 : 2;
+
+    // Light the current LED and create a tail effect with hue fading. The tail
+    // truncates at the ends rather than wrapping: it trails a head that is about
+    // to turn around, so wrapping would draw it at the far end of the strip.
+    for (int16_t tail = 0; tail < tailLength; tail++) {
       int16_t index = (direction > 0) ? (pos - tail) : (pos + tail);
 
-      if (index >= 0 && index < NUM_PIXELS) {
-        uint16_t tailHue = hue + ((compHue - hue) * tail / 16);
-        actual_led_strip_set_pixel_hsv(strip, index, tailHue);
+      if (index < 0 || index >= NUM_PIXELS) {
+        break;
       }
+
+      uint16_t tailHue = hue + ((compHue - hue) * tail / tailLength);
+      actual_led_strip_set_pixel_hsv(strip, index, tailHue);
     }
 
     // Update position and direction
