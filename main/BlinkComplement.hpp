@@ -55,19 +55,19 @@ public:
   }
 
   void loop() {
-    for (int i = 0; i <= 4; i++) {
-      for (int i = 0; i < NUM_PIXELS; i += 8) {
-        for (int j = i; j < i + 4; j++) {
-          actual_led_strip_set_pixel_hsv(strip, j, secondaryHue);
-        }
-        for (int j = i + 4; j < i + 8; j++) {
-          actual_led_strip_set_pixel_hsv(strip, j, primaryHue);
-        }
+    for (int i = 0; i < NUM_PIXELS; i += 8) {
+      for (int j = i; j < i + 4; j++) {
+        actual_led_strip_set_pixel_hsv(strip, j, secondaryHue);
       }
-      uint16_t temp = primaryHue;
-      primaryHue = secondaryHue;
-      secondaryHue = temp;
+      for (int j = i + 4; j < i + 8; j++) {
+        actual_led_strip_set_pixel_hsv(strip, j, primaryHue);
+      }
     }
+
+    // the exchange is the blink: each frame lands the opposite hue on each block
+    uint16_t temp = primaryHue;
+    primaryHue = secondaryHue;
+    secondaryHue = temp;
 
     zeroIsPrimaryHue = !zeroIsPrimaryHue;
 
