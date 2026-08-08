@@ -1,6 +1,10 @@
-build/*
-.devcontainer/*
-.vscode/*
-.DS_Store
-managed_components
+build/
+managed_components/
 sdkconfig
+sdkconfig.old
+.DS_Store
+
+# Both still describe the ESP32: an xtensa toolchain, an esp32 debug target,
+# and a qemu build that cannot emulate this chip. Worth tracking once true.
+.devcontainer/
+.vscode/
