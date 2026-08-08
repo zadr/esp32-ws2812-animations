@@ -44,7 +44,8 @@ public:
     }
 
     int getDelay() {
-        return 25;
+        // the delay macro floors to whole 10ms ticks
+        return 20;
     }
 
   int minIterations() override { return 1; }

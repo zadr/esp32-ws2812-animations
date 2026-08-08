@@ -38,7 +38,8 @@ public:
     int tag() override { return 1008; }
 
     int getDelay() {
-        return 15;
+        // the delay macro floors to whole 10ms ticks
+        return 10;
     }
 
 private:

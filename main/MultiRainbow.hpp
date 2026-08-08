@@ -49,7 +49,9 @@ public:
     int tag() override { return 1011; }
 
     int getDelay() {
-        return 5;
+        // the delay macro floors to whole 10ms ticks, so 10 is the shortest
+        // interval that actually blocks
+        return 10;
     }
 
 private:
