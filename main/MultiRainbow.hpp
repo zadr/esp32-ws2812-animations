@@ -18,20 +18,17 @@ public:
     }
 
     void setup() override {
-        int numberOfRainbows = esp_random_max(4) + 2; // max 7 min 2
-        int numberOfLEDsPerRainbow = NUM_PIXELS / numberOfRainbows;
-        uint16_t slice = HUE_MAX / numberOfLEDsPerRainbow;
+        int numberOfRainbows = esp_random_max(4) + 2; // inclusive, so 2 through 6
 
-        // Integer division leaves a remainder of pixels past the last full
-        // rainbow; without this they render whatever the heap held.
-        for (int i = 0; i < NUM_PIXELS; i++) {
-            hues[i] = 0;
-        }
-
+        // Pixels that do not divide evenly are spread across the rainbows rather
+        // than left trailing off the end, so every pixel belongs to a rainbow.
         for (int i = 0; i < numberOfRainbows; i++) {
-            int offset = i * numberOfLEDsPerRainbow;
-            for (int j = 0; j < numberOfLEDsPerRainbow; j++) {
-                hues[j + offset] = slice * j;
+            int begin = (i * NUM_PIXELS) / numberOfRainbows;
+            int end = ((i + 1) * NUM_PIXELS) / numberOfRainbows;
+            uint16_t slice = HUE_MAX / (end - begin);
+
+            for (int j = begin; j < end; j++) {
+                hues[j] = slice * (j - begin);
             }
         }
     }
