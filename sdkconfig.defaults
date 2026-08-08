@@ -1,1 +1,11 @@
+# sdkconfig is not tracked, so without this a fresh clone builds for esp32,
+# where GPIO 0 is a strapping pin and the USB Serial/JTAG console below does
+# not exist and is silently discarded.
+CONFIG_IDF_TARGET="esp32c6"
+
+# The XIAO ESP32-C6 has no USB-UART bridge; the console is the native USB
+# Serial/JTAG peripheral.
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# ESP32-C6-WROOM-1-N4 module. IDF otherwise assumes 2MB.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
