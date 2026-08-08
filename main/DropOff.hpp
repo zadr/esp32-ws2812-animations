@@ -11,8 +11,7 @@
 class DropOff : public Animation {
 public:
   DropOff(led_strip_handle_t& ws2812b, bool forward)
-    : Animation(ws2812b), currentStep(0), currentTarget(0), hueIndex(0), forward(forward),
-      falling(0), activeHue(0) {
+    : Animation(ws2812b), hueIndex(0), forward(forward), falling(0), activeHue(0) {
   }
   ~DropOff() {}
 
@@ -28,12 +27,10 @@ public:
   }
 
   void loop() {
+    // One block falls per hue and nothing is left behind it. DropIn is the
+    // counterpart that keeps what it drops.
     led_strip_clear(strip);
 
-    // Light the current dropping LED
-    actual_led_strip_set_pixel_hsv(strip, falling, activeHue);
-
-    // Keep fully dropped LEDs on
     for (int16_t k = 0; k < chunk(); k++) {
       if (falling - k >= 0) {
         actual_led_strip_set_pixel_hsv(strip, falling - k, activeHue);
@@ -54,7 +51,7 @@ public:
 
   int minIterations() override { return 1; }
   int maxIterations() override { return 1; }
-  int tag() override { return 1004; }
+  int tag() override { return 1012; }
 
 private:
     // Chunk scales with strip length but never reaches zero, which on a short
@@ -84,8 +81,6 @@ private:
       return 0;
     }
 
-    int currentStep;
-    int currentTarget;
     int hueIndex;
     bool forward;
     int16_t falling;

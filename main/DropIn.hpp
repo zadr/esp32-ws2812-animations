@@ -10,8 +10,7 @@
 class DropIn : public Animation {
 public:
   DropIn(led_strip_handle_t& ws2812b, bool forward)
-    : Animation(ws2812b), currentStep(0), currentTarget(0), hueIndex(0), forward(forward),
-      landed(0), falling(0), activeHue(0) {
+    : Animation(ws2812b), hueIndex(0), forward(forward), landed(0), falling(0), activeHue(0) {
   }
   ~DropIn() {}
 
@@ -31,12 +30,10 @@ public:
   }
 
   void loop() {
-    // A sweep leaves its trail lit, so the strip only clears where one begins.
+    // A sweep leaves its trail lit, so the strip only clears when one begins.
     if (falling == NUM_PIXELS - 1) {
       led_strip_clear(strip);
     }
-
-    actual_led_strip_set_pixel_hsv(strip, falling, activeHue);
 
     for (int16_t k = 0; k < chunk(); k++) {
       if (falling - k >= 0) {
@@ -97,8 +94,6 @@ private:
       return 0;
     }
 
-    int currentStep;
-    int currentTarget;
     int hueIndex;
     bool forward;
     int16_t landed;
