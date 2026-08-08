@@ -113,15 +113,18 @@ void basic_blink(void) {
 }
 
 void single(void) {
-  auto animation = blinkComplementAllHuesEvolution;
+  // Bound by reference so that swapping the animation above cannot slice it and
+  // so the object under inspection is the one the other drivers run.
+  auto& animation = blinkComplementAllHuesEvolution;
   ESP_LOGI("animation", "Starting %s!", __FUNCTION__);
   animation.setup();
 
-  for (int i = 0; i < animation.steps(); i++) {
-    ESP_LOGI("animation", "Looping %s step %d", __FUNCTION__, i);
+  int numberOfSteps = animation.steps();
+  for (int step = 0; step < numberOfSteps; step++) {
+    ESP_LOGI("animation", "Looping %s step %d of %d", __FUNCTION__, step, numberOfSteps);
     animation.loop();
     led_strip_refresh(led_strip);
-    vTaskDelay(animation.getDelay());
+    delay(animation.getDelay());
   }
 }
 
