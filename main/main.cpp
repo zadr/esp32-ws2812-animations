@@ -2,7 +2,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "bootloader_random.h"
-#include "driver/gpio.h"
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "sdkconfig.h"
