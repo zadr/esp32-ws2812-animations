@@ -51,24 +51,26 @@ public:
       break;
     }
 
-    for (uint16_t i = 0; i < NUM_PIXELS; i++) {
-      int16_t j = NUM_PIXELS - 1 - i;
-      if (j % 4 == 0) {
-        led_strip_clear(strip);
+    // Chunk scales with strip length but never reaches zero, which on a short
+    // strip would make the loop below stop advancing.
+    int amount = NUM_PIXELS / 72;
+    if (amount < 1) amount = 1;
+    // Descend from the top pixel so the far end is covered by the first chunk.
+    for (int16_t j = NUM_PIXELS - 1; j >= 0; j -= amount) {
+      led_strip_clear(strip);
 
-        // Light the current dropping LED
-        actual_led_strip_set_pixel_hsv(strip, j, hueToDrop);
+      // Light the current dropping LED
+      actual_led_strip_set_pixel_hsv(strip, j, hueToDrop);
 
-        // Keep fully dropped LEDs on
-        for (int16_t k = 0; k < 4; k++) {
-          if (j - k >= 0) {
-            actual_led_strip_set_pixel_hsv(strip, j - k, hueToDrop);
-          }
+      // Keep fully dropped LEDs on
+      for (int16_t k = 0; k < amount; k++) {
+        if (j - k >= 0) {
+          actual_led_strip_set_pixel_hsv(strip, j - k, hueToDrop);
         }
-
-        led_strip_refresh(strip);
-        delay(getDelay()); // Wait before moving to the next LED
       }
+
+      led_strip_refresh(strip);
+      delay(getDelay()); // Wait before moving to the next LED
     }
 
     hueIndex += forward ? 1 : -1;
