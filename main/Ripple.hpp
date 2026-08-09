@@ -5,7 +5,6 @@
 #include "Constants.h"
 #include "actual_led_strip_set_pixel_hsv.h"
 #include "esp_random.h"
-#include "esp_random_max.h"
 
 // hue_to_rgb pins saturation and value, but not luminance: a hue sitting on a
 // primary drives one channel, a hue between two drives two, so the strip holds
@@ -21,8 +20,7 @@
 class Ripple : public Animation {
 public:
   Ripple(led_strip_handle_t& strip)
-    : Animation(strip), backgroundHue(HUE_BLUE), bandSpent(HUE_RED), bandFull(HUE_YELLOW), frame(0) {
-    clearFronts();
+    : Animation(strip), backgroundHue(HUE_BLUE), bandSpent(HUE_RED), bandFull(HUE_YELLOW), seed(0) {
   }
 
   void setup() override {
@@ -36,29 +34,26 @@ public:
       bandFull = (HUE_GREEN + HUE_BLUE) / 2;
     }
 
-    frame = 0;
-    clearFronts();
+    seed = esp_random();
   }
 
-  int steps() override { return 720; }
+  int duration() override { return STEPS * MS_PER_PIXEL; }
 
-  void loop() override {
-    if (frame % IMPULSE_PERIOD == 0) {
-      impulse();
+  // Impulses land at random positions on a period and a front carries the energy
+  // the ends have left it, so there is no expression for the strip at t and it is
+  // walked to from the opening state instead. The walk is in a local, so the same
+  // t always arrives at the same fronts.
+  void render(uint16_t t) override {
+    State state = opening();
+
+    const int steps = stepsAt(t, STEPS);
+    for (int step = 0; step < steps; step++) {
+      advance(state, step);
     }
-    frame++;
 
-    for (int i = 0; i < MAX_FRONTS; i++) {
-      advance(fronts[i]);
-    }
-
-    render();
+    draw(state);
   }
 
-  int getDelay() override { return 20; }
-
-  int minIterations() override { return 1; }
-  int maxIterations() override { return 2; }
   int tag() override { return 1014; }
 
 private:
@@ -67,6 +62,13 @@ private:
   static const int8_t ENERGY_FULL = 3;
   static const int8_t MEDIUM = -1;
 
+  // Eight impulses at the period they are spaced by. A front covers a pixel a
+  // step, so the step is stated as the speed of the medium, which is what was
+  // tuned.
+  static const int IMPULSES = 8;
+  static const int STEPS = IMPULSE_PERIOD * IMPULSES;
+  static const int MS_PER_PIXEL = 20;
+
   struct Front {
     int16_t position;
     int8_t direction;
@@ -74,17 +76,32 @@ private:
     bool alive;
   };
 
-  void clearFronts() {
+  // Everything a step changes. It lives in render(), so no two renders can see
+  // each other's fronts.
+  struct State {
+    Front fronts[MAX_FRONTS];
+  };
+
+  // Still water. The first step is what disturbs it.
+  State opening() const { return State{}; }
+
+  void advance(State& state, int step) const {
+    if (step % IMPULSE_PERIOD == 0) {
+      impulse(state, step);
+    }
+
     for (int i = 0; i < MAX_FRONTS; i++) {
-      fronts[i].alive = false;
+      advance(state.fronts[i]);
     }
   }
 
-  void impulse() {
+  // The step index is what the position is drawn against, so the impulse of step
+  // 90 is in the same place however many times the walk passes through it.
+  void impulse(State& state, int step) const {
     int first = -1;
     int second = -1;
     for (int i = 0; i < MAX_FRONTS; i++) {
-      if (fronts[i].alive) {
+      if (state.fronts[i].alive) {
         continue;
       }
       if (first < 0) {
@@ -100,9 +117,9 @@ private:
       return;
     }
 
-    int16_t at = esp_random_max(NUM_PIXELS - 1);
-    start(fronts[first], at, -1);
-    start(fronts[second], at, 1);
+    const int16_t at = (int16_t)noiseMax(seed, step, 0, NUM_PIXELS - 1);
+    start(state.fronts[first], at, -1);
+    start(state.fronts[second], at, 1);
   }
 
   static void start(Front& front, int16_t at, int8_t direction) {
@@ -112,13 +129,13 @@ private:
     front.alive = true;
   }
 
-  // Every front moves one pixel a frame. Speed belongs to the medium rather than
+  // Every front moves one pixel a step. Speed belongs to the medium rather than
   // to whatever disturbed it, which is also why two fronts share a pixel and
   // come out the far side unchanged.
   //
   // Ends reflect, and the boundary is the only thing that takes energy. A front
   // that arrives already spent has nothing left to give it and is done.
-  void advance(Front& front) {
+  static void advance(Front& front) {
     if (!front.alive) {
       return;
     }
@@ -140,21 +157,22 @@ private:
     }
   }
 
-  void render() {
+  void draw(const State& state) const {
+    int8_t canvas[NUM_PIXELS];
     for (int i = 0; i < NUM_PIXELS; i++) {
       canvas[i] = MEDIUM;
     }
 
     // Two pixels wide: one is a dot with no direction to it, and three smears at
-    // a pixel a frame. The trailing pixel sits one level down the band, which
+    // a pixel a step. The trailing pixel sits one level down the band, which
     // gives the front a shape without spending a second colour on it.
     for (int i = 0; i < MAX_FRONTS; i++) {
-      if (!fronts[i].alive) {
+      const Front& front = state.fronts[i];
+      if (!front.alive) {
         continue;
       }
-      int8_t energy = fronts[i].energy;
-      paint(fronts[i].position, energy);
-      paint(fronts[i].position - fronts[i].direction, energy > 0 ? energy - 1 : 0);
+      paint(canvas, front.position, front.energy);
+      paint(canvas, front.position - front.direction, front.energy > 0 ? front.energy - 1 : 0);
     }
 
     for (int i = 0; i < NUM_PIXELS; i++) {
@@ -165,7 +183,7 @@ private:
   // Overlapping fronts add and then separate again. The band is the whole
   // budget, so the sum tops out at a full front rather than running past it into
   // a hue that no longer belongs to the ripple.
-  void paint(int16_t at, int8_t energy) {
+  static void paint(int8_t canvas[], int16_t at, int8_t energy) {
     if (at < 0 || at >= NUM_PIXELS) {
       return;
     }
@@ -181,12 +199,10 @@ private:
     return (uint16_t)(bandSpent + ((int32_t)bandFull - bandSpent) * energy / ENERGY_FULL);
   }
 
-  Front fronts[MAX_FRONTS];
-  int8_t canvas[NUM_PIXELS];
   uint16_t backgroundHue;
   uint16_t bandSpent;
   uint16_t bandFull;
-  uint32_t frame;
+  uint32_t seed;
 };
 
 #endif

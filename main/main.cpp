@@ -11,6 +11,7 @@
 
 // my animations
 #include "Constants.h"
+#include "Curve.hpp"
 #include "BlinkComplement.hpp"
 #include "Bounce.hpp"
 #include "CellularAutomaton.hpp"
@@ -126,6 +127,38 @@ Entry animations[] = {
   {&sortHeapSegment, "sort heap, segment"},
 };
 
+// CONFIG_FREERTOS_HZ is 100, so vTaskDelay resolves to whole 10ms ticks and this
+// is the shortest interval the driver can actually hold. It is also the interval
+// the fastest animations already ran at, so nothing loses smoothness by moving
+// to a fixed tick; what the slower ones gain is a redundant refresh, which costs
+// 1.5ms of RMT transmit on 50 pixels and no arithmetic, since a render that
+// finds nothing changed leaves the buffer alone.
+static const int TICK_MS = 10;
+
+static void run(Animation* animation, const char* name) {
+  // setup() decides the run and duration() reports on what it decided, so the
+  // order is load bearing and the answer is only good for this run.
+  animation->setup();
+  const int durationMs = animation->duration();
+
+  // Two is the floor. The first frame has to deliver 0 and the last has to
+  // deliver 65535, and one frame cannot be both.
+  int frames = durationMs / TICK_MS;
+  if (frames < 2) {
+    frames = 2;
+  }
+
+  ESP_LOGI("animation", "Running %s for %dms in %d frames", name, durationMs, frames);
+
+  const Curve curve = animation->curve();
+  for (int frame = 0; frame < frames; frame++) {
+    const uint16_t progress = (uint16_t)(((uint32_t)frame * 65535) / (frames - 1));
+    animation->render(curved(curve, progress));
+    led_strip_refresh(led_strip);
+    delay(TICK_MS);
+  }
+}
+
 static void configure_led(void) {
   led_strip_config_t strip_config = {};
   strip_config.strip_gpio_num = PIN_WS2812B;
@@ -146,60 +179,20 @@ void single(void) {
   // Bound by reference so that swapping the animation above cannot slice it and
   // so the object under inspection is the one the other drivers run.
   auto& animation = blinkComplementAllHuesEvolution;
-  ESP_LOGI("animation", "Starting %s!", __FUNCTION__);
-  animation.setup();
-
-  int numberOfSteps = animation.steps();
-  for (int step = 0; step < numberOfSteps; step++) {
-    ESP_LOGI("animation", "Looping %s step %d of %d", __FUNCTION__, step, numberOfSteps);
-    animation.loop();
-    led_strip_refresh(led_strip);
-    delay(animation.getDelay());
-  }
+  run(&animation, __FUNCTION__);
 }
 
 void inOrder(void) {
-  ESP_LOGI("animation", "Starting %s!", __FUNCTION__);
-
   int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
   for (int i = 0; i < numberOfAnimations; i++) {
-    ESP_LOGI("animation", "Starting %s", animations[i].name);
-    animations[i].animation->setup();
-
-    int numberOfSteps = animations[i].animation->steps();
-    for (int step = 0; step < numberOfSteps; step++) {
-      animations[i].animation->loop();
-      led_strip_refresh(led_strip);
-      delay(animations[i].animation->getDelay());
-    }
+    run(animations[i].animation, animations[i].name);
   }
 }
 
 void randomlySelect(void) {
-  ESP_LOGI("animation", "Starting %s", __FUNCTION__);
-
   int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
   int actualAnimationIndex = esp_random_max(numberOfAnimations - 1);
-  Animation* animation = animations[actualAnimationIndex].animation;
-  const char* name = animations[actualAnimationIndex].name;
-
-  ESP_LOGI("animation", "Picking %s, %d of %d", name, actualAnimationIndex, numberOfAnimations);
-  animation->setup();
-
-  int numberOfSteps = animation->steps();
-
-  // repeat a few times to look good
-  int range = animation->maxIterations() - animation->minIterations();
-  int repetitionCount = esp_random_max(range) + animation->minIterations();
-  if (repetitionCount > 6) { repetitionCount = 6; }
-  // for (int i = 0; i < repetitionCount; i++) {
-    for (int step = 0; step < numberOfSteps; step++) {
-      ESP_LOGI("animation", "Looping %s step %d of %d", name, step, numberOfSteps);
-      animation->loop();
-      led_strip_refresh(led_strip);
-      delay(animation->getDelay());
-    }
-  // }
+  run(animations[actualAnimationIndex].animation, animations[actualAnimationIndex].name);
 }
 
 extern "C" void app_main(void) {

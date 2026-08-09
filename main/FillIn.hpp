@@ -5,85 +5,69 @@
 #include "Constants.h"
 #include "actual_led_strip_set_pixel_hsv.h"
 #include "color_utils.hpp"
-#include "esp_random_max.h"
+#include "esp_random.h"
 
 class FillIn : public Animation {
 public:
   FillIn(led_strip_handle_t& strip, bool forward)
-    : Animation(strip), currentStep(0), hueIndex(0), activeHue(0), forward(forward) {
+    : Animation(strip), forward(forward), seed(0) {
   }
   ~FillIn() {}
 
-  // One step short of the first pixel at either end, so the first loop() lands
-  // on it the same way a band change does.
-  void setup() {
-    currentStep = forward ? -1 : NUM_PIXELS;
-    hueIndex = forward ? 0 : 6;
-    beginBand();
-  }
+  void setup() override { seed = esp_random(); }
 
-  int steps() {
-    return NUM_PIXELS * 7;
-  }
+  int duration() override { return NUM_PIXELS * BANDS * MS_PER_PIXEL; }
 
-  void loop() {
-    if (forward) {
-      currentStep += 1;
-      if (currentStep >= NUM_PIXELS) {
-        currentStep = 0;
-        hueIndex += 1;
-        beginBand();
-      }
-    } else {
-      currentStep -= 1;
-      if (currentStep < 0) {
-        currentStep = NUM_PIXELS - 1;
-        hueIndex -= 1;
-        beginBand();
+  // Step n lays the nth pixel of band n / NUM_PIXELS over what the band before
+  // left there, so the strip is two runs: the part this band has reached, and
+  // the part still standing from its predecessor. That is the whole lit set at
+  // n, which is why nothing has to accumulate in the buffer to arrive at it.
+  void render(uint16_t t) override {
+    const int n = stepsAt(t, NUM_PIXELS * BANDS - 1);
+    const int band = n / NUM_PIXELS;
+    const int reached = n % NUM_PIXELS;
+
+    led_strip_clear(strip);
+
+    const uint16_t filling = bandHue(band);
+    for (int i = 0; i <= reached; i++) {
+      actual_led_strip_set_pixel_hsv(strip, at(i), filling);
+    }
+
+    // The first band paints onto a dark strip, so ahead of it there is nothing
+    // to stand rather than a predecessor's colour.
+    if (band > 0) {
+      const uint16_t standing = bandHue(band - 1);
+      for (int i = reached + 1; i < NUM_PIXELS; i++) {
+        actual_led_strip_set_pixel_hsv(strip, at(i), standing);
       }
     }
-    actual_led_strip_set_pixel_hsv(strip, currentStep, activeHue);
   }
 
-  int getDelay() {
-    return 10;
-  }
-
-  int minIterations() override { return 1; }
-  int maxIterations() override { return 2; }
   int tag() override { return 1005; }
 
 private:
-  void beginBand() {
-    switch (hueIndex) {
-    case 0:
-      activeHue = drift(HUE_RED, esp_random_max(30));
-      break;
-    case 1:
-      activeHue = drift(HUE_ORANGE, esp_random_max(30));
-      break;
-    case 2:
-      activeHue = drift(HUE_YELLOW, esp_random_max(30));
-      break;
-    case 3:
-      activeHue = drift(HUE_GREEN, esp_random_max(30));
-      break;
-    case 4:
-      activeHue = drift(HUE_BLUE, esp_random_max(30));
-      break;
-    case 5:
-      activeHue = drift(HUE_INDIGO, esp_random_max(30));
-      break;
-    case 6:
-      activeHue = drift(HUE_VIOLET, esp_random_max(30));
-      break;
-    }
+  static const int BANDS = 7;
+  static const int MS_PER_PIXEL = 10;
+
+  static constexpr uint16_t ANCHORS[BANDS] = {
+    HUE_RED, HUE_ORANGE, HUE_YELLOW, HUE_GREEN, HUE_BLUE, HUE_INDIGO, HUE_VIOLET,
+  };
+
+  // Distance from the end the fill starts at, so a backward run is the same
+  // arithmetic read off the other end of the strip.
+  int at(int distance) const { return forward ? distance : NUM_PIXELS - 1 - distance; }
+
+  // Drift is hashed from the band rather than drawn when the band begins, so a
+  // render that lands mid palette knows the colour of a band it never walked
+  // through. A backward run takes the palette from the far end.
+  uint16_t bandHue(int band) const {
+    const uint32_t index = forward ? band : BANDS - 1 - band;
+    return driftBy(ANCHORS[index], noiseMax(seed, index, 0, 30), noise(seed, index, 1));
   }
 
-    int currentStep;
-    int hueIndex;
-    int activeHue;
-    bool forward;
+  const bool forward;
+  uint32_t seed;
 };
 
 #endif

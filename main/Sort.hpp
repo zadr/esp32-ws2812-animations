@@ -26,68 +26,76 @@ enum SortDataset : uint8_t {
 
 // The strip holds the array. Each algorithm runs to completion during setup
 // against a scratch copy, appending every operation that changes a pixel to a
-// queue, and loop() replays one queued operation per frame. The algorithms then
-// stay in their natural recursive or iterative form and steps() is the exact
-// frame count rather than an estimate.
+// queue, and the run replays that queue. The algorithms then stay in their
+// natural recursive or iterative form, and the queue can be seeked into rather
+// than only stepped, since every operation is already known.
+//
+// Operation counts differ by an order of magnitude between algorithms. The queue
+// is spread across a fixed replay window rather than paced per operation, so an
+// insertion sort and a bitonic sort take the same length of run and the
+// difference shows as how fast the strip moves.
 class Sort : public Animation {
 public:
   Sort(led_strip_handle_t& strip, SortAlgorithm algorithm, SortDataset dataset)
-    : Animation(strip), algorithm(algorithm), dataset(dataset), delayMs(100), frame(0), cursor(0) {}
+    : Animation(strip), algorithm(algorithm), dataset(dataset) {}
 
   void setup() override {
     buildKeys();
     shuffle();
     record();
-
-    delayMs = pace();
-    frame = 0;
-    cursor = 0;
   }
 
-  int steps() override { return introFrames() + recordCount + settleFrames(); }
+  int duration() override { return INTRO_MS + REPLAY_MS + SETTLE_MS; }
 
-  void loop() override {
-    int movedLow = -1;
-    int movedHigh = -1;
+  void render(uint16_t t) override {
+    const uint32_t elapsed = (uint32_t)t * duration() / 65535;
 
-    if (frame >= introFrames() && cursor < recordCount) {
-      const Op& op = operations[cursor];
-      cursor++;
-
-      if (op.kind == OpSwap) {
-        const uint8_t held = keys[op.a];
-        keys[op.a] = keys[op.b];
-        keys[op.b] = held;
-        movedHigh = op.b;
-      } else {
-        keys[op.a] = op.b;
-      }
-      movedLow = op.a;
+    // The array is the accumulation of every operation before it, so reaching
+    // one means applying all of them from the shuffle. The whole queue is known
+    // by the time a run starts, so this is a replay rather than a simulation and
+    // it costs a few thousand integer operations at its longest.
+    Array array = opening();
+    const int applied = stepsAt(replayProgress(elapsed), recordCount);
+    for (int i = 0; i < applied; i++) {
+      apply(array, operations[i]);
     }
-    frame++;
 
-    // The pixels this frame touched carry full output against the default the
-    // rest of the strip sits at. Hue alone cannot mark them: a segment spanning
-    // two anchors steps about one output level per pixel, so a moved pixel is
-    // indistinguishable from its neighbours by colour.
-    for (int i = 0; i < NUM_PIXELS; i++) {
-      const uint8_t value = (i == movedLow || i == movedHigh) ? 255 : VALUE_DEFAULT;
-      actual_led_strip_set_pixel_hsv(strip, i, keyHues[keys[i]], value);
+    // The sort has ended, so the strip stands sorted with nothing marked.
+    if (elapsed > INTRO_MS + REPLAY_MS) {
+      array.movedLow = -1;
+      array.movedHigh = -1;
     }
+
+    draw(array);
   }
-
-  // Operation counts differ by an order of magnitude between algorithms, so the
-  // pace follows the recorded length and every entry runs about as long.
-  int getDelay() override { return delayMs; }
-
-  // A sort ends. A second pass would replay the queue against an already sorted
-  // strip and show nothing.
-  int minIterations() override { return 1; }
-  int maxIterations() override { return 1; }
 
   int tag() override { return 1100 + (int)algorithm * (int)SortDatasetCount + (int)dataset; }
 
 private:
+  // Everything that moves during a run, held as a local of render() so that
+  // replaying to one operation leaves nothing behind for the next call to find.
+  struct Array {
+    uint8_t keys[NUM_PIXELS];
+    int movedLow;
+    int movedHigh;
+  };
+
+  // The shuffled array stands before anything moves and the sorted one stands
+  // after, so the shape of both is legible rather than glimpsed between
+  // operations.
+  static const int INTRO_MS = 1000;
+  static const int REPLAY_MS = 14000;
+  static const int SETTLE_MS = 2000;
+
+  // Progress across the replay alone, with the intro and settle clipped off
+  // either end. Sub windows of a run are a plain rescale of progress, so the
+  // replay reaches its own 65535 and every operation is applied.
+  static uint16_t replayProgress(uint32_t elapsed) {
+    if (elapsed <= INTRO_MS) return 0;
+    if (elapsed >= INTRO_MS + REPLAY_MS) return 65535;
+    return (uint16_t)((elapsed - INTRO_MS) * 65535 / REPLAY_MS);
+  }
+
   enum OpKind : uint8_t { OpSwap, OpSet };
 
   struct Op {
@@ -99,9 +107,6 @@ private:
   // Insertion sort on a reversed strip is the ceiling at 1225 operations.
   // Recording stops at the bound and the replay ends part sorted.
   static const int MAX_OPS = 1400;
-
-  static const int TARGET_MS = 14000;
-  static const int SLOWEST_MS = 400;
 
   // A sixth of the wheel ramps one channel across 255 steps before the pixel
   // value scales it down, so one output level is HUE_MAX / 6 / VALUE_DEFAULT
@@ -124,10 +129,44 @@ private:
   static inline uint8_t work[NUM_PIXELS];
   static inline uint8_t scratch[NUM_PIXELS];
 
+  Array opening() const {
+    Array array;
+    for (int i = 0; i < NUM_PIXELS; i++) {
+      array.keys[i] = shuffled[i];
+    }
+    array.movedLow = -1;
+    array.movedHigh = -1;
+    return array;
+  }
+
+  // The pixels the last operation touched carry full output against the default
+  // the rest of the strip sits at. Hue alone cannot mark them: a segment
+  // spanning two anchors steps about one output level per pixel, so a moved
+  // pixel is indistinguishable from its neighbours by colour.
+  void draw(const Array& array) const {
+    for (int i = 0; i < NUM_PIXELS; i++) {
+      const uint8_t value = (i == array.movedLow || i == array.movedHigh) ? 255 : VALUE_DEFAULT;
+      actual_led_strip_set_pixel_hsv(strip, i, keyHues[array.keys[i]], value);
+    }
+  }
+
+  static void apply(Array& array, const Op& op) {
+    if (op.kind == OpSwap) {
+      const uint8_t held = array.keys[op.a];
+      array.keys[op.a] = array.keys[op.b];
+      array.keys[op.b] = held;
+      array.movedHigh = op.b;
+    } else {
+      array.keys[op.a] = op.b;
+      array.movedHigh = -1;
+    }
+    array.movedLow = op.a;
+  }
+
   void record() {
     recordCount = 0;
     for (int i = 0; i < NUM_PIXELS; i++) {
-      work[i] = keys[i];
+      work[i] = shuffled[i];
     }
 
     switch (algorithm) {
@@ -140,17 +179,6 @@ private:
       default:            heapSort();                       break;
     }
   }
-
-  int pace() const {
-    const int perFrame = TARGET_MS / (recordCount > 0 ? recordCount : 1);
-    const int rounded = ((perFrame + 5) / 10) * 10;
-    if (rounded < 10) return 10;
-    if (rounded > SLOWEST_MS) return SLOWEST_MS;
-    return rounded;
-  }
-
-  int introFrames() const { return 1000 / delayMs; }
-  int settleFrames() const { return 2000 / delayMs; }
 
   void buildKeys() {
     static const uint16_t anchors[] = {
@@ -186,16 +214,16 @@ private:
       const uint16_t low = anchors[first + step];
       const uint16_t high = anchors[first + step + 1];
       keyHues[i] = (uint16_t)(low + (uint32_t)(high - low) * within / (NUM_PIXELS - 1));
-      keys[i] = i;
+      shuffled[i] = i;
     }
   }
 
   void shuffle() {
     for (int i = NUM_PIXELS - 1; i > 0; i--) {
       const int j = esp_random_max(i);
-      const uint8_t held = keys[i];
-      keys[i] = keys[j];
-      keys[j] = held;
+      const uint8_t held = shuffled[i];
+      shuffled[i] = shuffled[j];
+      shuffled[j] = held;
     }
   }
 
@@ -387,10 +415,7 @@ private:
 
   SortAlgorithm algorithm;
   SortDataset dataset;
-  int delayMs;
-  int frame;
-  int cursor;
-  uint8_t keys[NUM_PIXELS];
+  uint8_t shuffled[NUM_PIXELS];
   uint16_t keyHues[NUM_PIXELS];
 };
 

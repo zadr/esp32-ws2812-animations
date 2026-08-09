@@ -4,86 +4,75 @@
 #include "Animation.hpp"
 #include "Constants.h"
 #include "color_utils.hpp"
-#include "esp_random_max.h"
+#include "esp_random.h"
 #include "actual_led_strip_set_pixel_hsv.h"
 
 class DropOff : public Animation {
 public:
   DropOff(led_strip_handle_t& ws2812b, bool forward)
-    : Animation(ws2812b), hueIndex(0), forward(forward), falling(0), activeHue(0) {
+    : Animation(ws2812b), forward(forward), seed(0) {
   }
   ~DropOff() {}
 
-  void setup() {
-    hueIndex = forward ? 0 : 6;
-    // Start on the top pixel so the far end is covered by the first chunk.
-    falling = NUM_PIXELS - 1;
-    activeHue = pickHue();
-  }
+  void setup() override { seed = esp_random(); }
 
-  int steps() {
-    return ((NUM_PIXELS - 1) / chunk() + 1) * 7;
-  }
+  int duration() override { return positions() * MS_PER_POSITION; }
 
-  void loop() {
-    // One block falls per hue and nothing is left behind it. DropIn is the
-    // counterpart that keeps what it drops.
+  // One block falls per hue and nothing is left behind it, so the strip at step
+  // n is the block alone: which band it belongs to and how far down it has come
+  // both divide out of n. DropIn is the counterpart that keeps what it drops.
+  void render(uint16_t t) override {
+    const int n = stepsAt(t, positions() - 1);
+    const int band = n / restsPerBand();
+    const int falling = NUM_PIXELS - 1 - (n % restsPerBand()) * chunk();
+
     led_strip_clear(strip);
 
-    for (int16_t k = 0; k < chunk(); k++) {
+    const uint16_t hue = bandHue(band);
+    for (int k = 0; k < chunk(); k++) {
       if (falling - k >= 0) {
-        actual_led_strip_set_pixel_hsv(strip, falling - k, activeHue);
+        actual_led_strip_set_pixel_hsv(strip, falling - k, hue);
       }
     }
-
-    falling -= chunk();
-    if (falling < 0) {
-      falling = NUM_PIXELS - 1;
-      hueIndex += forward ? 1 : -1;
-      activeHue = pickHue();
-    }
   }
 
-  int getDelay() {
-    return 50;
-  }
-
-  int minIterations() override { return 1; }
-  int maxIterations() override { return 1; }
   int tag() override { return 1012; }
 
 private:
+    static const int BANDS = 7;
+
+    // What the block holds at each place it lands, so the descent keeps its
+    // pace on a strip long enough to widen the chunk.
+    static const int MS_PER_POSITION = 50;
+
+    static constexpr uint16_t ANCHORS[BANDS] = {
+      HUE_RED, HUE_ORANGE, HUE_YELLOW, HUE_GREEN, HUE_BLUE, HUE_INDIGO, HUE_VIOLET,
+    };
+
     // Chunk scales with strip length but never reaches zero, which on a short
     // strip would make the descent stop advancing.
-    int chunk() {
+    static int chunk() {
       int amount = NUM_PIXELS / 72;
       return amount < 1 ? 1 : amount;
     }
 
-    int pickHue() {
-      switch (hueIndex) {
-      case 0:
-        return drift(HUE_RED, esp_random_max(30));
-      case 1:
-        return drift(HUE_ORANGE, esp_random_max(30));
-      case 2:
-        return drift(HUE_YELLOW, esp_random_max(30));
-      case 3:
-        return drift(HUE_GREEN, esp_random_max(30));
-      case 4:
-        return drift(HUE_BLUE, esp_random_max(30));
-      case 5:
-        return drift(HUE_INDIGO, esp_random_max(30));
-      case 6:
-        return drift(HUE_VIOLET, esp_random_max(30));
-      }
-      return 0;
+    // Places the block comes to rest on the way down. A strip the chunk does
+    // not divide evenly ends on a short chunk rather than overshooting the
+    // bottom.
+    static int restsPerBand() { return (NUM_PIXELS - 1) / chunk() + 1; }
+
+    static int positions() { return restsPerBand() * BANDS; }
+
+    // Drift is hashed from the band rather than drawn when the band begins, so
+    // a render that lands mid palette knows the colour of a band it never
+    // walked through. A backward run takes the palette from the far end.
+    uint16_t bandHue(int band) const {
+      const uint32_t index = forward ? band : BANDS - 1 - band;
+      return driftBy(ANCHORS[index], noiseMax(seed, index, 0, 30), noise(seed, index, 1));
     }
 
-    int hueIndex;
-    bool forward;
-    int16_t falling;
-    int activeHue;
+    const bool forward;
+    uint32_t seed;
 };
 
 #endif

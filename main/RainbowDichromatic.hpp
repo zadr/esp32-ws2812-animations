@@ -6,156 +6,91 @@
 #include "Animation.hpp"
 #include "actual_led_strip_set_pixel_hsv.h"
 
+// Two hues on the strip at once, the third arriving at the far end as the first
+// leaves. The bands are laid end to end down a tape that the strip is a sliding
+// window onto, so where the run has got to is a distance along the tape and the
+// hue at a pixel is read from it rather than shifted into place.
 class RainbowDichromatic : public Animation {
 public:
     RainbowDichromatic(led_strip_handle_t& strip, bool forward)
-        : Animation(strip), currentHueIndex(0), currentHuePosition(NUM_PIXELS - 1), forward(forward) {}
+        : Animation(strip), forward(forward) {}
 
     ~RainbowDichromatic() {}
 
-    void setup() override {
-        currentHueIndex = 0;
-        currentHuePosition = NUM_PIXELS - 1;
+    // The tape is the same every run: the palette is fixed and the direction is
+    // constructed, so there is nothing here to decide and no entropy to draw.
+    void setup() override {}
 
-        if (forward) {
-            hues[0] = HUE_RED;
-            hues[NUM_PIXELS - 1] = HUE_ORANGE;
-        } else {
-            hues[0] = HUE_VIOLET;
-            hues[NUM_PIXELS - 1] = HUE_INDIGO;
+    // A step moves the queue one pixel, so the run is a distance rather than a
+    // count.
+    int duration() override { return SHIFTS * MS_PER_PIXEL; }
+
+    void render(uint16_t t) override {
+        const uint32_t travelled = (uint32_t)stepsAt(t, SHIFTS);
+
+        for (int i = 0; i < NUM_PIXELS; i++) {
+            actual_led_strip_set_pixel_hsv(strip, i, hueAt(travelled + i));
         }
-
-        interpolateColors(hues[0], hues[NUM_PIXELS - 1], 0, NUM_PIXELS - 1);
-
-        if (forward) {
-            hues[NUM_PIXELS * 2 - 1] = HUE_YELLOW;
-        } else {
-            hues[NUM_PIXELS * 2 - 1] = HUE_BLUE;
-        }
-
-        interpolateColors(hues[NUM_PIXELS - 1], hues[NUM_PIXELS * 2 - 1], NUM_PIXELS, NUM_PIXELS * 2 - 1);
     }
 
-    int steps() override {
-        return 720;
-    }
-
-    void loop() override {
-        animate();
-    }
-
-    int getDelay() {
-        // the delay macro floors to whole 10ms ticks
-        return 20;
-    }
-
-  int minIterations() override { return 1; }
-  int maxIterations() override { return 2; }
-  int tag() override { return 1007; }
+    int tag() override { return 1007; }
 
 private:
-    uint16_t hues[NUM_PIXELS * 2];
-    int currentHueIndex; // 0 - 6 (for the 7 color pairs)
-    int currentHuePosition; // 0 - NUM_PIXELS
-    bool forward;
+    // A pair holds the strip for NUM_PIXELS - 1 shifts and there are seven of
+    // them, so the run is a little over two laps of the palette.
+    static const int SHIFTS = 720;
+    static const int MS_PER_PIXEL = 20;
 
-    // Quadratic interpolation
-    void interpolateColors(uint16_t startHue, uint16_t endHue, int startIndex, int endIndex) {
-        int stepsPerColor = (endIndex - startIndex);
-        for (int i = 0; i <= stepsPerColor; i++) {
-            float t = (float)i / stepsPerColor;
-            hues[startIndex + i] = startHue + (endHue - startHue) * t * t;
-        }
+    // One short of the strip, so a band has just crossed it when the next one
+    // starts.
+    static constexpr uint32_t BAND_LENGTH = NUM_PIXELS - 1;
+
+    // Both ends stated per band rather than chained through a list of stops,
+    // since a lap has to cross the top of the wheel somewhere: forward closes
+    // at HUE_MAX, which is red arrived at from below.
+    static constexpr uint16_t FORWARD[][2] = {
+        {HUE_RED, HUE_ORANGE},
+        {HUE_ORANGE, HUE_YELLOW},
+        {HUE_YELLOW, HUE_GREEN},
+        {HUE_GREEN, HUE_BLUE},
+        {HUE_BLUE, HUE_INDIGO},
+        {HUE_INDIGO, HUE_VIOLET},
+        {HUE_VIOLET, HUE_MAX},
+    };
+
+    static constexpr uint16_t BACKWARD[][2] = {
+        {HUE_VIOLET, HUE_INDIGO},
+        {HUE_INDIGO, HUE_BLUE},
+        {HUE_BLUE, HUE_GREEN},
+        {HUE_GREEN, HUE_YELLOW},
+        {HUE_YELLOW, HUE_ORANGE},
+        {HUE_ORANGE, HUE_RED},
+        {HUE_RED, HUE_VIOLET},
+    };
+
+    static constexpr uint32_t BANDS = sizeof(FORWARD) / sizeof(FORWARD[0]);
+
+    // Which band a position falls in and how far into it are the same division.
+    uint16_t hueAt(uint32_t position) const {
+        const uint16_t (*bands)[2] = forward ? FORWARD : BACKWARD;
+        const uint16_t* band = bands[(position / BAND_LENGTH) % BANDS];
+
+        return ramp(band[0], band[1], position % BAND_LENGTH);
     }
 
-    void animate() {
-        for (int i = 0; i < NUM_PIXELS; i++) {
-            actual_led_strip_set_pixel_hsv(strip, i, hues[i]);
-        }
-
-        shiftHues();
+    // Quadratic in the distance across the band, so the arriving hue is crowded
+    // into the end of the ramp and the strip holds the hue it is leaving for
+    // most of the band's length.
+    //
+    // Integer throughout: this core has no hardware float, and the widest
+    // product is a full wheel against the square of the band, well inside 32
+    // bits.
+    static uint16_t ramp(uint16_t from, uint16_t to, uint32_t within) {
+        const int32_t span = (int32_t)to - (int32_t)from;
+        return (uint16_t)(from + span * (int32_t)(within * within) / (int32_t)(BAND_LENGTH * BAND_LENGTH));
     }
 
-    void shiftHues() {
-        uint16_t temp = hues[0];
-        for (int i = 0; i < NUM_PIXELS * 2 - 1; i++) {
-            hues[i] = hues[i + 1];
-        }
-        hues[NUM_PIXELS * 2 - 1] = temp;
-
-        currentHuePosition--;
-
-        if (currentHuePosition == 0) {
-            currentHuePosition = NUM_PIXELS - 1;
-            currentHueIndex = (currentHueIndex + 1) % 7;
-
-            if (forward) {
-                switch(currentHueIndex) {
-                    case 0:
-                        hues[NUM_PIXELS - 1] = HUE_ORANGE;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_YELLOW;
-                        break;
-                    case 1:
-                        hues[NUM_PIXELS - 1] = HUE_YELLOW;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_GREEN;
-                        break;
-                    case 2:
-                        hues[NUM_PIXELS - 1] = HUE_GREEN;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_BLUE;
-                        break;
-                    case 3:
-                        hues[NUM_PIXELS - 1] = HUE_BLUE;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_INDIGO;
-                        break;
-                    case 4:
-                        hues[NUM_PIXELS - 1] = HUE_INDIGO;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_VIOLET;
-                        break;
-                    case 5:
-                        hues[NUM_PIXELS - 1] = HUE_VIOLET;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_MAX;
-                        break;
-                    case 6:
-                        hues[NUM_PIXELS - 1] = HUE_RED;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_ORANGE;
-                        break;
-                }
-            } else {
-                switch(currentHueIndex) {
-                    case 0:
-                        hues[NUM_PIXELS - 1] = HUE_INDIGO;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_BLUE;
-                        break;
-                    case 1:
-                        hues[NUM_PIXELS - 1] = HUE_BLUE;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_GREEN;
-                        break;
-                    case 2:
-                        hues[NUM_PIXELS - 1] = HUE_GREEN;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_YELLOW;
-                        break;
-                    case 3:
-                        hues[NUM_PIXELS - 1] = HUE_YELLOW;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_ORANGE;
-                        break;
-                    case 4:
-                        hues[NUM_PIXELS - 1] = HUE_ORANGE;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_RED;
-                        break;
-                    case 5:
-                        hues[NUM_PIXELS - 1] = HUE_RED;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_VIOLET;
-                        break;
-                    case 6:
-                        hues[NUM_PIXELS - 1] = HUE_VIOLET;
-                        hues[NUM_PIXELS * 2 - 1] = HUE_INDIGO;
-                        break;
-                }
-            }
-
-            interpolateColors(hues[NUM_PIXELS - 1], hues[NUM_PIXELS * 2 - 1], NUM_PIXELS, NUM_PIXELS * 2 - 1);
-        }
-    }
+    const bool forward;
 };
 
 #endif

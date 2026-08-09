@@ -11,29 +11,36 @@
 class TheaterChase : public Animation {
 public:
   TheaterChase(led_strip_handle_t& strip, int spacing, bool forward)
-    : Animation(strip), spacing(spacing < 2 ? 2 : spacing), forward(forward), phase(0), litHue(0), alternateHue(0) {
+    : Animation(strip), spacing(spacing < 2 ? 2 : spacing), forward(forward), litHue(0), alternateHue(0) {
   }
   ~TheaterChase() {}
 
   void setup() override {
-    phase = 0;
     litHue = esp_random_max(HUE_VIOLET);
     alternateHue = COMPLEMENT(litHue);
   }
 
-  // A dot moves one pixel per frame, so this is six passes along the strip.
-  int steps() override {
-    return NUM_PIXELS * 6;
-  }
+  // Six passes along the strip at the speed a dot reads as running rather than
+  // sliding. Speed is stated as the time a dot takes to cross a pixel, which is
+  // what was tuned; the frames that fall inside it are the driver's affair.
+  int duration() override { return NUM_PIXELS * PASSES * MS_PER_PIXEL; }
 
-  void loop() override {
+  // Where the dots sit follows from t alone, so there is no counter and no state
+  // between renders. Two renders at the same t draw the same strip.
+  void render(uint16_t t) override {
+    const uint32_t travelled = ((uint32_t)t * (NUM_PIXELS * PASSES)) / 65535;
+    const int within = (int)(travelled % (uint32_t)cycle());
+
+    // Dots sit at i + phase, so the phase runs down to carry them up the strip.
+    const int phase = forward ? (cycle() - within) % cycle() : within;
+
     // Unlit gaps are the whole trick. Every pixel here is at the same output, so
     // filling the gaps with a contrasting hue would put the strip at full width
     // and leave the motion to read as a hue shimmer rather than running lights.
     led_strip_clear(strip);
 
     for (int i = 0; i < NUM_PIXELS; i++) {
-      int position = i + phase;
+      const int position = i + phase;
       if (position % spacing != 0) {
         continue;
       }
@@ -44,27 +51,20 @@ public:
       // travelling.
       actual_led_strip_set_pixel_hsv(strip, i, (position / spacing) % 2 == 0 ? litHue : alternateHue);
     }
-
-    // Dots sit at i + phase, so the phase counts down to carry them up the strip.
-    phase = (phase + (forward ? cycle() - 1 : 1)) % cycle();
   }
 
-  int getDelay() override {
-    return 60;
-  }
-
-  int minIterations() override { return 2; }
-  int maxIterations() override { return 4; }
   int tag() override { return 1015; }
 
 private:
+  static const int PASSES = 6;
+  static const int MS_PER_PIXEL = 60;
+
   // Two hues, so the pattern only comes back around after twice the spacing.
   // Wrapping the phase at the spacing alone would flip every dot at the seam.
   int cycle() const { return spacing * 2; }
 
   int spacing;
   bool forward;
-  int phase;
   uint16_t litHue;
   uint16_t alternateHue;
 };
