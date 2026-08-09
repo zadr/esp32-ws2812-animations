@@ -42,8 +42,6 @@ public:
   int tag() override { return 1004; }
 
 private:
-    static const int ANCHOR_COUNT = 7;
-
     // Colours a run may draw. A band is a fill of the whole strip, so walking the
     // palette end to end holds the strip for minutes, and a few colours picked
     // together carry the fill as well as seven unrelated ones do.
@@ -53,57 +51,38 @@ private:
     // on a strip long enough to widen the chunk.
     static const int MS_PER_POSITION = 25;
 
-    // A third of the wheel, as complementHue takes half of it. The palette's red,
-    // green and blue anchors sit within a hundred or so of these thirds, so a
-    // computed triad lands where this strip's own already is.
-    static constexpr uint16_t WHEEL_THIRD = (HUE_MAX + 1) / 3;
-
-    static constexpr uint16_t ANCHORS[ANCHOR_COUNT] = {
-      HUE_RED, HUE_ORANGE, HUE_YELLOW, HUE_GREEN, HUE_BLUE, HUE_INDIGO, HUE_VIOLET,
-    };
-
     // One relationship for the whole run, so the colours that arrive have a
-    // reason to be seen together and the run is as long as what it drew. All of
-    // it is the shared harmony helper's business once that exists: what it
-    // replaces is the body, not the shape, which is shades out and a count back.
+    // reason to be seen together and the run is as long as what it drew.
     //
     // The rotation is drawn once and applied to every anchor rather than per
     // colour, since a drift of up to a third of the wheel taken separately would
-    // leave nothing of the relationship. A partner computed from a rotated anchor
+    // leave nothing of the relationship. A member computed from a rotated anchor
     // is as exact as one computed from the anchor, and a run of anchors rotated
     // together keeps the spacing it was tuned with.
     int chooseShades(Shade out[MAX_BANDS]) const {
       const uint8_t amount = esp_random_max(30);
       const uint32_t direction = esp_random();
-      const uint16_t anchor = driftBy(ANCHORS[esp_random_max(ANCHOR_COUNT - 1)], amount, direction);
+      const int count = esp_random_max(MAX_BANDS - 1) + 1;
 
-      switch (esp_random_max(3)) {
-      case 0:
-        out[0] = { anchor, VALUE_DEFAULT };
-        return 1;
+      // Levelling brings a set down to its dimmest member, and the more members
+      // it has the further that reaches, so the ceiling comes up to meet a triad
+      // rather than the triad running at a fraction of what a pair does.
+      const uint8_t ceiling = count == MAX_BANDS ? 255 : VALUE_DEFAULT;
 
-      case 1: {
-        const ShadePair pair = complementPair(anchor);
-        out[0] = pair.base;
-        out[1] = pair.partner;
-        return 2;
-      }
-
-      case 2:
-        out[0] = { anchor, VALUE_DEFAULT };
-        out[1] = { (uint16_t)(anchor + WHEEL_THIRD), VALUE_DEFAULT };
-        out[2] = { (uint16_t)(anchor + 2 * WHEEL_THIRD), VALUE_DEFAULT };
-        return 3;
-
-      default: {
-        const int length = esp_random_max(1) + 2;
-        const int first = esp_random_max(ANCHOR_COUNT - length);
-        for (int i = 0; i < length; i++) {
-          out[i] = { driftBy(ANCHORS[first + i], amount, direction), VALUE_DEFAULT };
+      // Adjacent anchors are the relationship that is not a division of the
+      // wheel, the palette being spaced by eye rather than by angle, so they are
+      // levelled where they are rather than through spread.
+      if (count > 1 && esp_random_max(1) == 0) {
+        const int first = esp_random_max(ANCHOR_COUNT - count);
+        for (int i = 0; i < count; i++) {
+          out[i].hue = driftBy(ANCHORS[first + i], amount, direction);
         }
-        return length;
+        level(out, count, ceiling);
+        return count;
       }
-      }
+
+      spread(driftBy(ANCHORS[esp_random_max(ANCHOR_COUNT - 1)], amount, direction), count, out, ceiling);
+      return count;
     }
 
     // Chunk scales with strip length but never reaches zero, which on a short
