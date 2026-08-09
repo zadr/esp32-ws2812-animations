@@ -57,8 +57,6 @@ BlinkComplement blinkComplementAllHuesEvolution(led_strip, true, true);
 Bounce bounce(led_strip);
 Twinkle twinkle(led_strip);
 CellularAutomaton automatonAny(led_strip);
-CellularAutomaton automatonRule30(led_strip, 30);
-CellularAutomaton automatonRule110(led_strip, 110);
 TheaterChase theaterChaseForward(led_strip, 3, true);
 TheaterChase theaterChaseBackward(led_strip, 3, false);
 Interference interference(led_strip);
@@ -104,8 +102,6 @@ Entry animations[] = {
   {&blinkComplementDefinedColorsEvolution, "blink complement, palette, evolving"},
   {&blinkComplementAllHuesEvolution, "blink complement, all hues, evolving"},
   {&automatonAny, "cellular automaton"},
-  {&automatonRule30, "cellular automaton, rule 30"},
-  {&automatonRule110, "cellular automaton, rule 110"},
   {&theaterChaseForward, "theater chase fwd"},
   {&theaterChaseBackward, "theater chase rev"},
   {&interference, "interference"},
