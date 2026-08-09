@@ -18,6 +18,7 @@
 #include "DropOff.hpp"
 #include "FillIn.hpp"
 #include "FlashWhite.hpp"
+#include "Interference.hpp"
 #include "MultiRainbow.hpp"
 #include "RainbowDichromatic.hpp"
 #include "RainbowFull.hpp"
@@ -55,6 +56,7 @@ CellularAutomaton rule30(led_strip, 30);
 CellularAutomaton rule110(led_strip, 110);
 TheaterChase theaterChaseForward(led_strip, 3, true);
 TheaterChase theaterChaseBackward(led_strip, 3, false);
+Interference interference(led_strip);
 
 // Named here rather than on Animation, since direction and the BlinkComplement
 // flags distinguish entries that share a class.
@@ -84,6 +86,7 @@ Entry animations[] = {
   {&rule110, "rule 110"},
   {&theaterChaseForward, "theater chase fwd"},
   {&theaterChaseBackward, "theater chase rev"},
+  {&interference, "interference"},
 };
 
 static void configure_led(void) {
