@@ -1,14 +1,13 @@
 #ifndef RAINBOWSINGLECOLORSLICE_HPP
 #define RAINBOWSINGLECOLORSLICE_HPP
 
-#include "led_strip.h"
 #include "Animation.hpp"
 #include "Constants.h"
 #include "actual_led_strip_set_pixel_hsv.h"
 
 class RainbowSingleColorSlice : public Animation {
 public:
-    RainbowSingleColorSlice(led_strip_handle_t& strip, bool direction)
+    RainbowSingleColorSlice(Frame& strip, bool direction)
         : Animation(strip), adding(direction) {}
 
     // The strip is one hue throughout, so there is nothing to seed.

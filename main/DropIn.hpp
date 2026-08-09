@@ -10,7 +10,7 @@
 
 class DropIn : public Animation {
 public:
-  DropIn(led_strip_handle_t& ws2812b, bool forward)
+  DropIn(Frame& ws2812b, bool forward)
     : Animation(ws2812b), forward(forward), shades{}, bands(0) {
   }
   ~DropIn() {}

@@ -1,7 +1,6 @@
 #ifndef RAINBOWDICHROMATIC_HPP
 #define RAINBOWDICHROMATIC_HPP
 
-#include "led_strip.h"
 #include "Constants.h"
 #include "Animation.hpp"
 #include "actual_led_strip_set_pixel_hsv.h"
@@ -12,7 +11,7 @@
 // hue at a pixel is read from it rather than shifted into place.
 class RainbowDichromatic : public Animation {
 public:
-    RainbowDichromatic(led_strip_handle_t& strip, bool forward)
+    RainbowDichromatic(Frame& strip, bool forward)
         : Animation(strip), forward(forward) {}
 
     ~RainbowDichromatic() {}

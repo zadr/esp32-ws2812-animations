@@ -1,7 +1,6 @@
 #ifndef CELLULARAUTOMATON_HPP
 #define CELLULARAUTOMATON_HPP
 
-#include "led_strip.h"
 #include "esp_log.h"
 #include "Animation.hpp"
 #include "Constants.h"
@@ -20,7 +19,7 @@
 class CellularAutomaton : public Animation {
 public:
   // Rule 0 leaves nothing alive, so it can stand for no pin at all.
-  CellularAutomaton(led_strip_handle_t& strip, uint8_t pinned = 0)
+  CellularAutomaton(Frame& strip, uint8_t pinned = 0)
     : Animation(strip), pinned(pinned), rule(0), seed(0), seedCell(0), seedHue(0) {}
 
   void setup() override {

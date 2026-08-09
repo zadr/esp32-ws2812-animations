@@ -9,7 +9,7 @@
 
 class DropOff : public Animation {
 public:
-  DropOff(led_strip_handle_t& ws2812b, bool forward)
+  DropOff(Frame& ws2812b, bool forward)
     : Animation(ws2812b), forward(forward), seed(0) {
   }
   ~DropOff() {}

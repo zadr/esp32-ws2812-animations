@@ -10,7 +10,7 @@
 
 class Twinkle : public Animation {
 public:
-  Twinkle(led_strip_handle_t& strip) : Animation(strip), backgroundHue(0), seed(0) {}
+  Twinkle(Frame& strip) : Animation(strip), backgroundHue(0), seed(0) {}
 
   void setup() override {
     backgroundHue = esp_random_max(HUE_VIOLET);

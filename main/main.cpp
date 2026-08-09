@@ -12,6 +12,7 @@
 // my animations
 #include "Constants.h"
 #include "Curve.hpp"
+#include "Frame.hpp"
 #include "BlinkComplement.hpp"
 #include "Bounce.hpp"
 #include "CellularAutomaton.hpp"
@@ -35,49 +36,53 @@
 
 static led_strip_handle_t led_strip;
 
+// One between all of them, since a single animation runs at a time and it is
+// handed a blank one.
+static Frame buffer;
+
 // animation inits
 // Array of animation objects
 // FlashWhite flashWhite(ws2812b);
-FullRainbow fullRainbowForward(led_strip, true);
-FullRainbow fullRainbowBackward(led_strip, false);
-RainbowSingleColorSlice rainbowSliceForward(led_strip, true);
-RainbowSingleColorSlice rainbowSliceBackward(led_strip, false);
-RainbowDichromatic rainbowDichromaticForward(led_strip, true);
-RainbowDichromatic rainbowDichromaticBackward(led_strip, false);
-MultiRainbow multiRainbowForwards(led_strip, true);
-MultiRainbow multiRainbowBackwards(led_strip, false);
-DropIn dropInForward(led_strip, true);
-DropIn dropInBackwards(led_strip, false);
-DropOff dropOffForward(led_strip, true);
-DropOff dropOffBackwards(led_strip, false);
-FillIn fillInForward(led_strip, true);
-FillIn fillInBackwards(led_strip, false);
-BlinkComplement blinkComplementDefinedColors(led_strip, false, false);
-BlinkComplement blinkComplementAllHues(led_strip, true, false);
-BlinkComplement blinkComplementDefinedColorsEvolution(led_strip, false, true);
-BlinkComplement blinkComplementAllHuesEvolution(led_strip, true, true);
-Bounce bounce(led_strip);
-Twinkle twinkle(led_strip);
-CellularAutomaton automatonAny(led_strip);
-TheaterChase theaterChaseForward(led_strip, 3, true);
-TheaterChase theaterChaseBackward(led_strip, 3, false);
-Interference interference(led_strip);
-Collision collision(led_strip);
-Ripple ripple(led_strip);
-Sort sortBitonicRainbow(led_strip, SortBitonic, SortRainbow);
-Sort sortBitonicSegment(led_strip, SortBitonic, SortSegment);
-Sort sortQuickRainbow(led_strip, SortQuick, SortRainbow);
-Sort sortQuickSegment(led_strip, SortQuick, SortSegment);
-Sort sortRadixRainbow(led_strip, SortRadix, SortRainbow);
-Sort sortRadixSegment(led_strip, SortRadix, SortSegment);
-Sort sortMergeRainbow(led_strip, SortMerge, SortRainbow);
-Sort sortMergeSegment(led_strip, SortMerge, SortSegment);
-Sort sortInsertionRainbow(led_strip, SortInsertion, SortRainbow);
-Sort sortInsertionSegment(led_strip, SortInsertion, SortSegment);
-Sort sortSelectionRainbow(led_strip, SortSelection, SortRainbow);
-Sort sortSelectionSegment(led_strip, SortSelection, SortSegment);
-Sort sortHeapRainbow(led_strip, SortHeap, SortRainbow);
-Sort sortHeapSegment(led_strip, SortHeap, SortSegment);
+FullRainbow fullRainbowForward(buffer, true);
+FullRainbow fullRainbowBackward(buffer, false);
+RainbowSingleColorSlice rainbowSliceForward(buffer, true);
+RainbowSingleColorSlice rainbowSliceBackward(buffer, false);
+RainbowDichromatic rainbowDichromaticForward(buffer, true);
+RainbowDichromatic rainbowDichromaticBackward(buffer, false);
+MultiRainbow multiRainbowForwards(buffer, true);
+MultiRainbow multiRainbowBackwards(buffer, false);
+DropIn dropInForward(buffer, true);
+DropIn dropInBackwards(buffer, false);
+DropOff dropOffForward(buffer, true);
+DropOff dropOffBackwards(buffer, false);
+FillIn fillInForward(buffer, true);
+FillIn fillInBackwards(buffer, false);
+BlinkComplement blinkComplementDefinedColors(buffer, false, false);
+BlinkComplement blinkComplementAllHues(buffer, true, false);
+BlinkComplement blinkComplementDefinedColorsEvolution(buffer, false, true);
+BlinkComplement blinkComplementAllHuesEvolution(buffer, true, true);
+Bounce bounce(buffer);
+Twinkle twinkle(buffer);
+CellularAutomaton automatonAny(buffer);
+TheaterChase theaterChaseForward(buffer, 3, true);
+TheaterChase theaterChaseBackward(buffer, 3, false);
+Interference interference(buffer);
+Collision collision(buffer);
+Ripple ripple(buffer);
+Sort sortBitonicRainbow(buffer, SortBitonic, SortRainbow);
+Sort sortBitonicSegment(buffer, SortBitonic, SortSegment);
+Sort sortQuickRainbow(buffer, SortQuick, SortRainbow);
+Sort sortQuickSegment(buffer, SortQuick, SortSegment);
+Sort sortRadixRainbow(buffer, SortRadix, SortRainbow);
+Sort sortRadixSegment(buffer, SortRadix, SortSegment);
+Sort sortMergeRainbow(buffer, SortMerge, SortRainbow);
+Sort sortMergeSegment(buffer, SortMerge, SortSegment);
+Sort sortInsertionRainbow(buffer, SortInsertion, SortRainbow);
+Sort sortInsertionSegment(buffer, SortInsertion, SortSegment);
+Sort sortSelectionRainbow(buffer, SortSelection, SortRainbow);
+Sort sortSelectionSegment(buffer, SortSelection, SortSegment);
+Sort sortHeapRainbow(buffer, SortHeap, SortRainbow);
+Sort sortHeapSegment(buffer, SortHeap, SortSegment);
 
 // Named here rather than on Animation, since direction and the BlinkComplement
 // flags distinguish entries that share a class.
@@ -226,9 +231,15 @@ static const int TICK_MS = 10;
 // render() next to the refresh, and an animation that lights part of the strip
 // no longer has to ask for the rest.
 static void blank(void) {
+  buffer.clear();
+}
+
+// The frame is what an animation drew; the wire gets it here and nowhere else.
+static void present(void) {
   for (int i = 0; i < NUM_PIXELS; i++) {
-    led_strip_set_pixel(led_strip, i, 0, 0, 0);
+    led_strip_set_pixel(led_strip, i, buffer.rgb[i][0], buffer.rgb[i][1], buffer.rgb[i][2]);
   }
+  led_strip_refresh(led_strip);
 }
 
 static void run(Animation* animation, const char* name) {
@@ -251,7 +262,7 @@ static void run(Animation* animation, const char* name) {
     const uint16_t progress = (uint16_t)(((uint32_t)frame * 65535) / (frames - 1));
     blank();
     animation->render(curved(curve, progress));
-    led_strip_refresh(led_strip);
+    present();
     delay(TICK_MS);
   }
 }

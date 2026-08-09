@@ -13,7 +13,7 @@
 // either lit or it is not.
 class Collision : public Animation {
 public:
-  Collision(led_strip_handle_t& strip) : Animation(strip), seed(0) {}
+  Collision(Frame& strip) : Animation(strip), seed(0) {}
 
   void setup() override { seed = esp_random(); }
 

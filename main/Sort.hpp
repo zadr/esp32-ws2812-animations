@@ -36,7 +36,7 @@ enum SortDataset : uint8_t {
 // difference shows as how fast the strip moves.
 class Sort : public Animation {
 public:
-  Sort(led_strip_handle_t& strip, SortAlgorithm algorithm, SortDataset dataset)
+  Sort(Frame& strip, SortAlgorithm algorithm, SortDataset dataset)
     : Animation(strip), algorithm(algorithm), dataset(dataset) {}
 
   void setup() override {

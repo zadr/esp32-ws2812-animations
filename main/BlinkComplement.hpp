@@ -10,7 +10,7 @@
 
 class BlinkComplement : public Animation {
 public:
-  BlinkComplement(led_strip_handle_t& strip, bool fullRandom, bool evolves)
+  BlinkComplement(Frame& strip, bool fullRandom, bool evolves)
     : Animation(strip), fullRandom(fullRandom), evolves(evolves), primaryHue(0), secondaryHue(0), seed(0) {
   }
   ~BlinkComplement() {}

@@ -7,7 +7,7 @@
 
 class FlashWhite : public Animation {
 public:
-    FlashWhite(led_strip_handle_t& strip) : Animation(strip) {}
+    FlashWhite(Frame& strip) : Animation(strip) {}
 
     void setup() override {}
 
@@ -31,7 +31,7 @@ public:
       const uint32_t greenBlue = lit ? 255 * BRIGHTNESS_SCALE : 0;
 
       for (int i = 0; i < NUM_PIXELS; i++) {
-        led_strip_set_pixel(strip, i, red, greenBlue, greenBlue);
+        strip.set(i, red, greenBlue, greenBlue);
       }
     }
 

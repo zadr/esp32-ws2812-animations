@@ -10,7 +10,7 @@
 
 class Bounce : public Animation {
 public:
-  Bounce(led_strip_handle_t& strip) : Animation(strip), hue(0), seed(0) {}
+  Bounce(Frame& strip) : Animation(strip), hue(0), seed(0) {}
 
   void setup() override {
     hue = esp_random_max(HUE_VIOLET);

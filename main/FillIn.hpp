@@ -9,7 +9,7 @@
 
 class FillIn : public Animation {
 public:
-  FillIn(led_strip_handle_t& strip, bool forward)
+  FillIn(Frame& strip, bool forward)
     : Animation(strip), forward(forward), seed(0) {
   }
   ~FillIn() {}

@@ -22,7 +22,7 @@
 // rid of. Water is that arc anyway.
 class Ripple : public Animation {
 public:
-  Ripple(led_strip_handle_t& strip) : Animation(strip), hue(HUE_BLUE), seed(0) {}
+  Ripple(Frame& strip) : Animation(strip), hue(HUE_BLUE), seed(0) {}
 
   void setup() override {
     hue = (uint16_t)(HUE_GREEN + esp_random_max(HUE_BLUE - HUE_GREEN));

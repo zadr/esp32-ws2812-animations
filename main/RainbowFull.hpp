@@ -1,14 +1,13 @@
 #ifndef FULLRAINBOW_HPP
 #define FULLRAINBOW_HPP
 
-#include "led_strip.h"
 #include "Constants.h"
 #include "Animation.hpp"
 #include "actual_led_strip_set_pixel_hsv.h"
 
 class FullRainbow : public Animation {
 public:
-    FullRainbow(led_strip_handle_t& strip, bool direction)
+    FullRainbow(Frame& strip, bool direction)
         : Animation(strip), adding(direction) {}
 
     // The wheel laid once across the strip. These are the hues the run turns

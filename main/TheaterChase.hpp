@@ -5,12 +5,11 @@
 #include "Constants.h"
 #include "actual_led_strip_set_pixel_hsv.h"
 #include "esp_random_max.h"
-#include "led_strip.h"
 #include <stdint.h>
 
 class TheaterChase : public Animation {
 public:
-  TheaterChase(led_strip_handle_t& strip, int spacing, bool forward)
+  TheaterChase(Frame& strip, int spacing, bool forward)
     : Animation(strip), spacing(spacing < 2 ? 2 : spacing), forward(forward), litHue(0), alternateHue(0) {
   }
   ~TheaterChase() {}

@@ -31,7 +31,7 @@ static const uint16_t INTERFERENCE_TIME_STEP_SHORT = 691;
 // reads as loud or quiet.
 class Interference : public Animation {
 public:
-  Interference(led_strip_handle_t& strip)
+  Interference(Frame& strip)
     : Animation(strip), hue(HUE_GREEN), setupPhaseLong(0), setupPhaseShort(0) {
   }
   ~Interference() {}

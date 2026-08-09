@@ -2,9 +2,9 @@
 #define HUE_TO_RGB
 
 #include <math.h>
-#include "led_strip.h"
 #include "esp_log.h"
 #include "Constants.h"
+#include "Frame.hpp"
 
 // Kept for the one animation that renders white directly and so cannot reach the
 // red compensation through the hue path.
@@ -65,7 +65,7 @@ static uint32_t red_level(uint8_t value) {
 //
 // Divided by 255 rather than shifted by 8, since a channel at full has to come
 // through value unchanged.
-static void actual_led_strip_set_pixel_hsv(led_strip_handle_t strip, uint32_t index, uint16_t hue, uint8_t value = VALUE_DEFAULT) {
+static void actual_led_strip_set_pixel_hsv(Frame &frame, uint32_t index, uint16_t hue, uint8_t value = VALUE_DEFAULT) {
   if (index >= NUM_PIXELS) return;
 
   uint32_t r = 0; uint32_t g = 0; uint32_t b = 0;
@@ -75,10 +75,10 @@ static void actual_led_strip_set_pixel_hsv(led_strip_handle_t strip, uint32_t in
   g = (g * 255) >> 16;
   b = (b * 255) >> 16;
 
-  led_strip_set_pixel(strip, index,
-                      r * red_level(value) / (255 * 256),
-                      g * value / 255,
-                      b * value / 255);
+  frame.set(index,
+            r * red_level(value) / (255 * 256),
+            g * value / 255,
+            b * value / 255);
 }
 
 #endif

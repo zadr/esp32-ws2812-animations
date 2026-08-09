@@ -2,12 +2,12 @@
 #define ANIMATION_HPP
 
 #include "Curve.hpp"
-#include "led_strip.h"
+#include "Frame.hpp"
 #include <stdint.h>
 
 class Animation {
 public:
-    Animation(led_strip_handle_t& strip) : strip(strip) {}
+    Animation(Frame& strip) : strip(strip) {}
     virtual ~Animation() {}
 
     // Everything a run is decided by, and the only place entropy is drawn. What
@@ -72,7 +72,7 @@ protected:
       return noise(seed, step, lane) % (max + 1);
     }
 
-    led_strip_handle_t& strip;
+    Frame& strip;
 };
 
 #endif
