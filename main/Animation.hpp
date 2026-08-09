@@ -41,7 +41,7 @@ public:
     // animation lights the pixels it wants and neither clears nor refreshes.
     virtual void render(uint16_t t) = 0;
 
-    virtual Curve curve() const { return CurveQuadraticInOut; }
+    virtual Curve curve() const { return CurveTrapezoidInOut; }
 
     virtual int tag() = 0;
 
