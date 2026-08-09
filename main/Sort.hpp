@@ -49,18 +49,31 @@ public:
 
   void render(uint16_t t) override {
     const uint32_t elapsed = (uint32_t)t * duration() / 65535;
+    const int applied = stepsAt(replayProgress(elapsed), recordCount);
 
     // The array is the accumulation of every operation before it, so reaching
-    // one means applying all of them from the shuffle. The whole queue is known
-    // by the time a run starts, so this is a replay rather than a simulation and
-    // it costs a few thousand integer operations at its longest.
-    Array array = opening();
-    const int applied = stepsAt(replayProgress(elapsed), recordCount);
-    for (int i = 0; i < applied; i++) {
-      apply(array, operations[i]);
+    // one means every operation from the shuffle has been applied. The array the
+    // last call left standing already carries its share of them, so a target
+    // ahead of it costs the operations between the two, however far ahead it
+    // sits, and a queue is walked once across a run rather than once a frame.
+    //
+    // A target behind it starts over from the shuffle, since an operation cannot
+    // be undone from what it wrote. What is kept is a memo of a state that t
+    // alone decides, so two calls at one t still draw one strip and t in any
+    // order is still answered.
+    if (replayedCount < 0 || replayedCount > applied) {
+      replayed = opening();
+      replayedCount = 0;
     }
+    for (int i = replayedCount; i < applied; i++) {
+      apply(replayed, operations[i]);
+    }
+    replayedCount = applied;
 
-    // The sort has ended, so the strip stands sorted with nothing marked.
+    // The sort has ended, so the strip stands sorted with nothing marked. On a
+    // copy, since it is this t that is past the end and not the replay, which
+    // resumes from the same operation count either way.
+    Array array = replayed;
     if (elapsed > INTRO_MS + REPLAY_MS) {
       array.movedLow = -1;
       array.movedHigh = -1;
@@ -72,8 +85,9 @@ public:
   int tag() override { return 1100 + (int)algorithm * (int)SortDatasetCount + (int)dataset; }
 
 private:
-  // Everything that moves during a run, held as a local of render() so that
-  // replaying to one operation leaves nothing behind for the next call to find.
+  // Everything that moves during a run. What a run does to it is fixed by the
+  // queue, so an instance of it is named by the number of operations standing
+  // in it and nothing else.
   struct Array {
     uint8_t keys[NUM_PIXELS];
     int movedLow;
@@ -129,6 +143,13 @@ private:
   static inline uint8_t work[NUM_PIXELS];
   static inline uint8_t scratch[NUM_PIXELS];
 
+  // How far the replay has got, kept for the next call to carry on from. It
+  // answers to the queue above and to the shuffle that queue was recorded
+  // against, neither of which belongs to an instance, so it is shared on the
+  // same terms and a recording drops it. A negative count is no array at all.
+  static inline Array replayed;
+  static inline int replayedCount = -1;
+
   Array opening() const {
     Array array;
     for (int i = 0; i < NUM_PIXELS; i++) {
@@ -165,6 +186,7 @@ private:
 
   void record() {
     recordCount = 0;
+    replayedCount = -1;
     for (int i = 0; i < NUM_PIXELS; i++) {
       work[i] = shuffled[i];
     }
