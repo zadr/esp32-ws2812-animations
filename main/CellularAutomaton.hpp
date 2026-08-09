@@ -8,6 +8,57 @@
 #include "esp_random.h"
 #include "esp_random_max.h"
 
+// One bit per pixel. The target has no integer this wide, so the ring is two
+// words with the high one masked back to the pixels that exist; a rotation is
+// then compared word by word, high word first, for the smallest-rotation key to
+// order states the way it does on a single word.
+struct Cells {
+  uint64_t word[2] = {0, 0};
+
+  constexpr Cells() {}
+  constexpr Cells(uint64_t low, uint64_t high) : word{low, high} {}
+
+  static constexpr Cells mask(int bits) {
+    return bits >= 128  ? Cells(~0ULL, ~0ULL)
+           : bits > 64  ? Cells(~0ULL, (1ULL << (bits - 64)) - 1)
+           : bits == 64 ? Cells(~0ULL, 0)
+                        : Cells((1ULL << bits) - 1, 0);
+  }
+
+  constexpr bool bit(int i) const { return (word[i / 64] >> (i % 64)) & 1; }
+  constexpr void set(int i) { word[i / 64] |= 1ULL << (i % 64); }
+
+  // Taken by less than the width, so neither side handles everything falling
+  // out.
+  constexpr Cells operator<<(int by) const {
+    if (by == 0) return *this;
+    if (by >= 64) return Cells(0, word[0] << (by - 64));
+    return Cells(word[0] << by, (word[1] << by) | (word[0] >> (64 - by)));
+  }
+
+  constexpr Cells operator>>(int by) const {
+    if (by == 0) return *this;
+    if (by >= 64) return Cells(word[1] >> (by - 64), 0);
+    return Cells((word[0] >> by) | (word[1] << (64 - by)), word[1] >> by);
+  }
+
+  constexpr Cells operator&(const Cells& other) const {
+    return Cells(word[0] & other.word[0], word[1] & other.word[1]);
+  }
+
+  constexpr Cells operator|(const Cells& other) const {
+    return Cells(word[0] | other.word[0], word[1] | other.word[1]);
+  }
+
+  constexpr bool operator==(const Cells& other) const {
+    return word[0] == other.word[0] && word[1] == other.word[1];
+  }
+
+  constexpr bool operator<(const Cells& other) const {
+    return word[1] != other.word[1] ? word[1] < other.word[1] : word[0] < other.word[0];
+  }
+};
+
 // An elementary automaton, one generation at a time. The rule is the Wolfram
 // byte: bit (left << 2 | self << 1 | right) is what that neighbourhood becomes.
 // The strip is a ring, so a pattern running off one end arrives at the other
@@ -63,7 +114,7 @@ public:
   int tag() override { return 1013; }
 
 private:
-  static_assert(NUM_PIXELS < 64, "the ring is carried in one word");
+  static_assert(NUM_PIXELS <= 128, "the ring is carried in two words");
 
   // A rule needs room to get past what it does first. Rule 30 closes the ring on
   // itself in half a lap and boils for the rest; rule 110 needs a full lap
@@ -71,7 +122,7 @@ private:
   // just closed has not been watched doing anything with it. Five laps at the
   // one cell per generation speed limit is what that comes to, and the run is
   // sized to hold them.
-  static constexpr int RUN_MS = 24000;
+  static constexpr int RUN_MS = 48000;
 
   // A generation is a discrete event, so this is its dwell rather than a frame
   // interval. Taken against the cruise, which the trapezoid holds a seventh
@@ -80,17 +131,17 @@ private:
   static constexpr int GENERATIONS = RUN_MS * 6 / (MS_PER_GENERATION * 7);
   static_assert(GENERATIONS >= NUM_PIXELS * 5, "the run is short of five laps of the ring");
 
-  static constexpr uint64_t RING = (1ULL << NUM_PIXELS) - 1;
+  static constexpr Cells RING = Cells::mask(NUM_PIXELS);
   static constexpr int HISTORY = 32;
-  static constexpr uint64_t VACANT = ~0ULL; // sits outside RING, so it matches nothing
+  static constexpr Cells VACANT = Cells(~0ULL, ~0ULL); // sits outside RING, so it matches nothing
 
   // Everything that moves during a run. Whole, so that a Ring plus the number
   // of generations standing in it is the entire walk and nothing else has to be
   // carried alongside it to resume.
   struct Ring {
-    uint64_t cells;
-    uint64_t previous;
-    uint64_t history[HISTORY];
+    Cells cells;
+    Cells previous;
+    Cells history[HISTORY];
     int historyNext;
   };
 
@@ -119,8 +170,9 @@ private:
 
   Ring opening() const {
     Ring ring;
-    ring.cells = 1ULL << seedCell;
-    ring.previous = 0;
+    ring.cells = Cells();
+    ring.cells.set(seedCell);
+    ring.previous = Cells();
     forget(ring);
     return ring;
   }
@@ -141,26 +193,28 @@ private:
   // as the boundary between the settled side of a pattern and the churning side.
   void draw(const Ring& ring, uint16_t base) const {
     const uint16_t settled = (base + HUE_SPAN / 8) % HUE_SPAN;
-    const uint64_t held = ring.cells & ring.previous;
+    const Cells held = ring.cells & ring.previous;
     for (uint16_t i = 0; i < NUM_PIXELS; i++) {
-      if ((ring.cells >> i) & 1) {
-        actual_led_strip_set_pixel_hsv(strip, i, ((held >> i) & 1) ? settled : base);
+      if (ring.cells.bit(i)) {
+        actual_led_strip_set_pixel_hsv(strip, i, held.bit(i) ? settled : base);
       }
     }
   }
 
-  uint64_t successor(uint64_t cells) const {
-    uint64_t next = 0;
+  Cells successor(Cells cells) const {
+    Cells next;
     for (uint16_t i = 0; i < NUM_PIXELS; i++) {
-      uint8_t left = (cells >> ((i + NUM_PIXELS - 1) % NUM_PIXELS)) & 1;
-      uint8_t self = (cells >> i) & 1;
-      uint8_t right = (cells >> ((i + 1) % NUM_PIXELS)) & 1;
-      next |= (uint64_t)((rule >> ((left << 2) | (self << 1) | right)) & 1) << i;
+      uint8_t left = cells.bit((i + NUM_PIXELS - 1) % NUM_PIXELS);
+      uint8_t self = cells.bit(i);
+      uint8_t right = cells.bit((i + 1) % NUM_PIXELS);
+      if ((rule >> ((left << 2) | (self << 1) | right)) & 1) {
+        next.set(i);
+      }
     }
     return next;
   }
 
-  static uint64_t turn(uint64_t state, uint16_t by) {
+  static Cells turn(Cells state, uint16_t by) {
     return by == 0 ? state : (((state << by) | (state >> (NUM_PIXELS - by))) & RING);
   }
 
@@ -177,17 +231,17 @@ private:
   // against every entry was four fifths of the cost of a generation, which is
   // the difference between a walk that can be repeated every frame and one that
   // cannot.
-  static uint64_t smallestTurn(uint64_t state) {
-    uint64_t smallest = state;
+  static Cells smallestTurn(Cells state) {
+    Cells smallest = state;
     for (uint16_t by = 1; by < NUM_PIXELS; by++) {
-      const uint64_t turned = turn(state, by);
+      const Cells turned = turn(state, by);
       if (turned < smallest) smallest = turned;
     }
     return smallest;
   }
 
-  static bool recurs(const Ring& ring, uint64_t state) {
-    const uint64_t key = smallestTurn(state);
+  static bool recurs(const Ring& ring, Cells state) {
+    const Cells key = smallestTurn(state);
     for (int h = 0; h < HISTORY; h++) {
       if (ring.history[h] == key) return true;
     }
@@ -198,12 +252,13 @@ private:
   // opening it just stalled from. Drawn against the generation it stalled at, so
   // a stall reseeds the same way however often the run is walked through.
   void reseed(Ring& ring, int generation) const {
-    ring.cells = (((uint64_t)noise(seed, generation, 0) << 32) | noise(seed, generation, 1)) & RING;
-    ring.previous = 0;
+    ring.cells = Cells(((uint64_t)noise(seed, generation, 0) << 32) | noise(seed, generation, 1),
+                       ((uint64_t)noise(seed, generation, 2) << 32) | noise(seed, generation, 3)) & RING;
+    ring.previous = Cells();
     forget(ring);
   }
 
-  static void remember(Ring& ring, uint64_t state) {
+  static void remember(Ring& ring, Cells state) {
     ring.history[ring.historyNext] = smallestTurn(state);
     ring.historyNext = (ring.historyNext + 1) % HISTORY;
   }
