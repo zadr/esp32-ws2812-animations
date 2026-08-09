@@ -4,5 +4,5 @@
 idf_component_register(
     SRCS "main.cpp"
     INCLUDE_DIRS "."
-    PRIV_REQUIRES esp_wifi bootloader_support esp_driver_rmt
+    PRIV_REQUIRES esp_wifi bootloader_support esp_driver_spi
 )

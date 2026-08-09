@@ -1,147 +1,134 @@
 #ifndef STRIP_HPP
 #define STRIP_HPP
 
-#include "driver/rmt_encoder.h"
-#include "driver/rmt_tx.h"
+#include <stdint.h>
+
+#include "driver/spi_master.h"
 #include "esp_err.h"
-#include "soc/soc_caps.h"
+#include "esp_log.h"
 
 #include "Constants.h"
 #include "Frame.hpp"
 
-// The RMT channel and the encoder that put a Frame on the wire. Held here
+// The SPI channel and the expansion that put a Frame on the wire. Held here
 // rather than reached through a driver that keeps pixels of its own, so the
 // bytes an animation rendered are the bytes the strip is sent.
+//
+// The C6's RMT has no DMA, so the CPU built every pulse descriptor and refilled
+// 48 words of channel memory across the whole 3ms send. SPI2 is served by GDMA,
+// so the waveform is written once into memory and clocked out with the CPU
+// asleep. What SPI cannot do is vary a symbol's length, so the shape of a bit
+// has to be spelled out in fixed slots instead.
 
-// One tick per 100ns. Every interval below is a whole number of ticks at this
-// rate, so nothing in the timing depends on how a fraction rounds.
-static const uint32_t STRIP_RESOLUTION_HZ = 10 * 1000 * 1000;
-
-static constexpr uint16_t strip_ticks(uint32_t nanoseconds) {
-  return (uint16_t)((uint64_t)STRIP_RESOLUTION_HZ * nanoseconds / 1000000000);
-}
+// 80MHz / 24 is exactly 3.3333MHz, so a slot is 300ns with nothing to round.
+// That is the coarsest slot that divides both halves of both bit shapes, and so
+// the shortest expansion: four slots to a colour bit, 1.2us, as before.
+static const int STRIP_SLOT_HZ = 3333333;
+static const uint32_t STRIP_SLOTS_PER_BIT = 4;
 
 // A bit is 1.2us whichever it is; which one it is is where the edge inside it
-// falls.
-static const uint16_t STRIP_T0H_TICKS = strip_ticks(300);
-static const uint16_t STRIP_T0L_TICKS = strip_ticks(900);
-static const uint16_t STRIP_T1H_TICKS = strip_ticks(900);
-static const uint16_t STRIP_T1L_TICKS = strip_ticks(300);
+// falls. 1000 is 0.3 high then 0.9 low, 1110 is 0.9 then 0.3.
+static constexpr uint32_t strip_shape(uint32_t bit) {
+  return bit ? 0xE : 0x8;
+}
 
 // The low period the strip reads as end of frame. 280us is 5.6x the 50us the
-// datasheet asks and is what this strip has been driven at. One symbol carries
-// two levels, so each half holds 140us.
-static const uint16_t STRIP_LATCH_TICKS = strip_ticks(140000);
+// datasheet asks and is what this strip has been driven at; 934 slots is the
+// first value at or above it that a 300ns slot can express, 280.2us.
+static const uint32_t STRIP_LATCH_SLOTS = 934;
 
-// Pixel bytes and the latch behind them are one transaction, so the strip
-// cannot see a gap where the frame ends.
-struct StripEncoder {
-  rmt_encoder_t base;
-  rmt_encoder_t* bytes;
-  rmt_encoder_t* copy;
-  rmt_symbol_word_t latch;
-  bool latching;
+static const uint32_t STRIP_PIXEL_SLOTS = NUM_PIXELS * 3 * 8 * STRIP_SLOTS_PER_BIT;
+static const uint32_t STRIP_WAVE_BITS = STRIP_PIXEL_SLOTS + STRIP_LATCH_SLOTS;
+
+// A colour byte is four wire bytes, so a whole word of waveform comes of one
+// lookup and one store. Expanding a bit at a time would only move the work RMT
+// was doing onto this side of the wire.
+//
+// Wire order is the order a store leaves in memory, which the low byte of a
+// word reaches first.
+static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__, "wave words are stored in wire order");
+
+struct StripExpansion {
+  uint32_t word[256];
 };
 
-// Runs from the transmit ISR as the channel's symbol memory drains, which is
-// why it is in IRAM: 48 symbols of channel memory against a frame's 1200 bits
-// means most of a frame is encoded from the interrupt.
-RMT_ENCODER_FUNC_ATTR
-static size_t strip_encode(rmt_encoder_t* encoder, rmt_channel_handle_t channel,
-                           const void* data, size_t size, rmt_encode_state_t* ret_state) {
-  StripEncoder* strip = (StripEncoder*)encoder;
-  rmt_encode_state_t session = RMT_ENCODING_RESET;
-  uint32_t state = RMT_ENCODING_RESET;
-  size_t symbols = 0;
+static constexpr StripExpansion strip_expansion() {
+  StripExpansion expansion = {};
 
-  // Which of the two a resumed call is in the middle of.
-  if (!strip->latching) {
-    symbols += strip->bytes->encode(strip->bytes, channel, data, size, &session);
-    if (session & RMT_ENCODING_COMPLETE) {
-      strip->latching = true;
+  for (uint32_t value = 0; value < 256; value++) {
+    uint32_t word = 0;
+    // Most significant colour bit first, two to a wire byte.
+    for (uint32_t index = 0; index < 4; index++) {
+      const uint32_t high = strip_shape((value >> (7 - 2 * index)) & 1);
+      const uint32_t low = strip_shape((value >> (6 - 2 * index)) & 1);
+      word |= ((high << 4) | low) << (8 * index);
     }
-    if (session & RMT_ENCODING_MEM_FULL) {
-      *ret_state = RMT_ENCODING_MEM_FULL;
-      return symbols;
-    }
+    expansion.word[value] = word;
   }
 
-  symbols += strip->copy->encode(strip->copy, channel, &strip->latch, sizeof(strip->latch), &session);
-  if (session & RMT_ENCODING_COMPLETE) {
-    strip->latching = false;
-    state |= RMT_ENCODING_COMPLETE;
-  }
-  if (session & RMT_ENCODING_MEM_FULL) {
-    state |= RMT_ENCODING_MEM_FULL;
-  }
-
-  *ret_state = (rmt_encode_state_t)state;
-  return symbols;
+  return expansion;
 }
 
-RMT_ENCODER_FUNC_ATTR
-static esp_err_t strip_encoder_reset(rmt_encoder_t* encoder) {
-  StripEncoder* strip = (StripEncoder*)encoder;
-  rmt_encoder_reset(strip->bytes);
-  rmt_encoder_reset(strip->copy);
-  strip->latching = false;
-  return ESP_OK;
-}
+static constexpr StripExpansion STRIP_EXPANSION = strip_expansion();
 
 // One strip, for as long as the program runs, so neither is handed around and
 // neither has a delete to reach.
-static rmt_channel_handle_t stripChannel;
-static StripEncoder stripEncoder;
+//
+// The waveform, not a second copy of the picture: a Frame is still the only
+// place a pixel's duty is written down, and this is what that duty looks like
+// on the wire. Words past the pixels are the latch, which is zero from load and
+// is never written again.
+static spi_device_handle_t stripDevice;
+static uint32_t stripWave[(STRIP_WAVE_BITS + 31) / 32];
 
 static void strip_start(void) {
-  rmt_tx_channel_config_t channelConfig = {};
-  channelConfig.gpio_num = (gpio_num_t)PIN_WS2812B;
-  channelConfig.clk_src = RMT_CLK_SRC_DEFAULT;
-  channelConfig.resolution_hz = STRIP_RESOLUTION_HZ;
-  channelConfig.mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL;
-  // A frame is waited on before the next is rendered, so one descriptor is
-  // every transaction there will ever be in flight.
-  channelConfig.trans_queue_depth = 1;
-  // The C6's RMT has no DMA, so the ISR is what refills the channel.
-  channelConfig.flags.with_dma = false;
-  ESP_ERROR_CHECK(rmt_new_tx_channel(&channelConfig, &stripChannel));
+  spi_bus_config_t busConfig = {};
+  busConfig.mosi_io_num = PIN_WS2812B;
+  // Data alone drives the strip; a zeroed config would name GPIO 0 for all of
+  // these and hand the pin to the clock as well.
+  busConfig.miso_io_num = -1;
+  busConfig.sclk_io_num = -1;
+  busConfig.quadwp_io_num = -1;
+  busConfig.quadhd_io_num = -1;
+  // Where the line sits between frames, which is where the latch already left
+  // it, so an idle strip sees one continuous low and not an edge.
+  busConfig.data_io_default_level = false;
+  busConfig.max_transfer_sz = sizeof(stripWave);
+  ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &busConfig, SPI_DMA_CH_AUTO));
 
-  rmt_bytes_encoder_config_t bytesConfig = {};
-  bytesConfig.bit0.level0 = 1;
-  bytesConfig.bit0.duration0 = STRIP_T0H_TICKS;
-  bytesConfig.bit0.level1 = 0;
-  bytesConfig.bit0.duration1 = STRIP_T0L_TICKS;
-  bytesConfig.bit1.level0 = 1;
-  bytesConfig.bit1.duration0 = STRIP_T1H_TICKS;
-  bytesConfig.bit1.level1 = 0;
-  bytesConfig.bit1.duration1 = STRIP_T1L_TICKS;
-  bytesConfig.flags.msb_first = 1;
-  ESP_ERROR_CHECK(rmt_new_bytes_encoder(&bytesConfig, &stripEncoder.bytes));
+  spi_device_interface_config_t deviceConfig = {};
+  // PLL_F80M on this part, the 80MHz the slot rate is a whole division of.
+  deviceConfig.clock_source = SPI_CLK_SRC_DEFAULT;
+  deviceConfig.clock_speed_hz = STRIP_SLOT_HZ;
+  deviceConfig.mode = 0;
+  deviceConfig.spics_io_num = -1;
+  // A frame is waited on before the next is rendered, so one is every
+  // transaction there will ever be in flight.
+  deviceConfig.queue_size = 1;
+  ESP_ERROR_CHECK(spi_bus_add_device(SPI2_HOST, &deviceConfig, &stripDevice));
 
-  rmt_copy_encoder_config_t copyConfig = {};
-  ESP_ERROR_CHECK(rmt_new_copy_encoder(&copyConfig, &stripEncoder.copy));
-
-  stripEncoder.base.encode = strip_encode;
-  stripEncoder.base.reset = strip_encoder_reset;
-  stripEncoder.latch.level0 = 0;
-  stripEncoder.latch.duration0 = STRIP_LATCH_TICKS;
-  stripEncoder.latch.level1 = 0;
-  stripEncoder.latch.duration1 = STRIP_LATCH_TICKS;
-
-  // Enabled once and left enabled. Enabling around each transmit resets the
-  // channel every frame and leaves the line exactly where the latch already
-  // left it, so it buys nothing that is visible on the wire.
-  ESP_ERROR_CHECK(rmt_enable(stripChannel));
+  // The bit shapes are only what they claim to be if the divider landed where
+  // it was asked to, and nothing downstream would show that it had not.
+  int slotKhz = 0;
+  ESP_ERROR_CHECK(spi_device_get_actual_freq(stripDevice, &slotKhz));
+  ESP_LOGI("strip", "%dkHz slot, %.1fns", slotKhz, 1000000.0 / slotKhz);
 }
 
 // Waited on rather than queued, so the frame the caller holds is not being read
-// by the encoder once this returns and the next render can write over it.
+// by the DMA once this returns and the next render can write over it.
 static void strip_transmit(const Frame& frame) {
-  rmt_transmit_config_t transmitConfig = {};
-  transmitConfig.loop_count = 0;
+  for (uint32_t i = 0; i < sizeof(frame.wire); i++) {
+    stripWave[i] = STRIP_EXPANSION.word[frame.wire[i]];
+  }
 
-  ESP_ERROR_CHECK(rmt_transmit(stripChannel, &stripEncoder.base, frame.wire, sizeof(frame.wire), &transmitConfig));
-  ESP_ERROR_CHECK(rmt_tx_wait_all_done(stripChannel, -1));
+  // Pixel bytes and the latch behind them are one transaction, so the strip
+  // cannot see a gap where the frame ends. Length is in slots rather than
+  // bytes, which is how the latch comes out at 934 of them.
+  spi_transaction_t transaction = {};
+  transaction.length = STRIP_WAVE_BITS;
+  transaction.tx_buffer = stripWave;
+
+  ESP_ERROR_CHECK(spi_device_transmit(stripDevice, &transaction));
 }
 
 #endif
