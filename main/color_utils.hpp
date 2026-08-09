@@ -16,6 +16,17 @@ static const uint32_t LUMA_RED = 2;
 static const uint32_t LUMA_GREEN = 4;
 static const uint32_t LUMA_BLUE = 1;
 
+// The tuned hues in the order anything stepping through them takes.
+//
+// It does not close. Violet to red is 12455 units of wheel that has never been
+// judged against this strip, wider than four of the six measured intervals, so
+// it is not an interval of the same kind and nothing here steps across it.
+static const uint16_t ANCHORS[] = {
+    HUE_RED, HUE_ORANGE, HUE_YELLOW, HUE_GREEN, HUE_BLUE, HUE_INDIGO, HUE_VIOLET,
+};
+
+static const int ANCHOR_COUNT = sizeof(ANCHORS) / sizeof(ANCHORS[0]);
+
 struct Shade {
     uint16_t hue;
     uint8_t value;
@@ -126,6 +137,60 @@ static uint32_t spread(uint16_t hue, int count, Shade* out, uint8_t value = VALU
 
     for (int i = 0; i < count; i++) {
         out[i].hue = (uint16_t)(hue + (uint32_t)i * (HUE_MAX + 1) / count);
+    }
+
+    return level(out, count, value);
+}
+
+// Distance is taken the short way around, so a hue in the wedge above violet
+// finds red rather than the anchor it happens to sit below.
+static int nearestAnchor(uint16_t hue) {
+    int nearest = 0;
+    uint32_t best = 0;
+
+    for (int i = 0; i < ANCHOR_COUNT; i++) {
+        uint32_t away = hue > ANCHORS[i] ? (uint32_t)hue - ANCHORS[i] : (uint32_t)ANCHORS[i] - hue;
+        if (away > (HUE_MAX + 1) / 2) {
+            away = (HUE_MAX + 1) - away;
+        }
+
+        if (i == 0 || away < best) {
+            best = away;
+            nearest = i;
+        }
+    }
+
+    return nearest;
+}
+
+// Neighbouring hues taken from the palette rather than from the wheel, centred
+// on the anchor nearest the one asked for and levelled with it.
+//
+// An angle cannot stand in for a step here. The anchors are spaced by eye and
+// the intervals between them run from 1476 units to 21669, so a fixed offset is
+// two colours apart at one end of the palette and inside a single colour at the
+// other, which is the whole reason the palette is a list and not a formula.
+//
+// The window slides to stay inside the list rather than wrapping, and a count
+// above the anchors there are gets all of them.
+static uint32_t analogous(uint16_t hue, int count, Shade* out, uint8_t value = VALUE_DEFAULT) {
+    if (count < 1) {
+        return 0;
+    }
+    if (count > ANCHOR_COUNT) {
+        count = ANCHOR_COUNT;
+    }
+
+    int first = nearestAnchor(hue) - (count - 1) / 2;
+    if (first + count > ANCHOR_COUNT) {
+        first = ANCHOR_COUNT - count;
+    }
+    if (first < 0) {
+        first = 0;
+    }
+
+    for (int i = 0; i < count; i++) {
+        out[i].hue = ANCHORS[first + i];
     }
 
     return level(out, count, value);
