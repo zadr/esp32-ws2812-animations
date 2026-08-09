@@ -11,6 +11,7 @@
 #include "Curve.hpp"
 #include "Frame.hpp"
 #include "Strip.hpp"
+#include "Transition.hpp"
 #include "BlinkComplement.hpp"
 #include "Bounce.hpp"
 #include "CellularAutomaton.hpp"
@@ -35,6 +36,12 @@
 // One between all of them, since a single animation runs at a time and it is
 // handed a blank one.
 static Frame buffer;
+
+// The frame the last animation finished on, kept for the next one to come up
+// against. A finished animation is never called again, so what it left is all
+// there is of it.
+static Frame outgoing;
+static bool haveOutgoing = false;
 
 // animation inits
 // Array of animation objects
@@ -221,6 +228,10 @@ static const int GROUP_COUNT = sizeof(groups) / sizeof(groups[0]);
 // frame identical to the one before it, which is 1.5ms of RMT on 50 pixels.
 static const int TICK_MS = 10;
 
+// The one the driver runs. Swapping it is the whole of changing how animations
+// hand over.
+static const Transition TRANSITION = TransitionCrossfade;
+
 // Blanking is a statement about the buffer and not about the wire, so it sits
 // on this side of render() next to the transmit. An animation that lights part
 // of the strip does not have to ask for the rest, and clearing never costs a
@@ -234,9 +245,35 @@ static void present(void) {
   strip_transmit(buffer);
 }
 
+// The handover from the frame the last animation left to the first frame of
+// this one. The outgoing side is a still and the incoming side is held at its
+// opening frame, so the tick carries one render, the same one a solo run puts on
+// it, whatever either animation costs to draw.
+static void transitionTo(Animation* incoming) {
+  int steps = TRANSITION_MS / TICK_MS;
+  if (steps < 2) {
+    steps = 2;
+  }
+
+  // Step 0 is the outgoing frame alone, which the run that just ended drew and
+  // the strip is still holding, so the fade starts one step in. The last step is
+  // the incoming animation alone at t == 0.
+  for (int step = 1; step < steps; step++) {
+    const uint16_t progress = (uint16_t)(((uint32_t)step * 65535) / (steps - 1));
+    blank();
+    // Every curve is pinned at zero, so this is the opening frame under the one
+    // the incoming animation asks for.
+    incoming->render(0);
+    transitioned(TRANSITION, outgoing, buffer, curved(TRANSITION_CURVE, progress));
+    present();
+    delay(TICK_MS);
+  }
+}
+
 static void run(Animation* animation, const char* name) {
   // setup() decides the run and duration() reports on what it decided, so the
-  // order is load bearing and the answer is only good for this run.
+  // order is load bearing and the answer is only good for this run. A transition
+  // renders this animation, so it comes after setup() as well.
   animation->setup();
   const int durationMs = animation->duration();
 
@@ -249,14 +286,29 @@ static void run(Animation* animation, const char* name) {
 
   ESP_LOGI("animation", "Running %s for %dms in %d frames", name, durationMs, frames);
 
+  // A transition lands on t == 0, so the run picks up at the step after it and
+  // no frame is drawn on both sides of the seam. With nothing to come from, the
+  // run opens on t == 0 itself.
+  int first = 0;
+  if (haveOutgoing) {
+    transitionTo(animation);
+    first = 1;
+  }
+
   const Curve curve = animation->curve();
-  for (int frame = 0; frame < frames; frame++) {
+  for (int frame = first; frame < frames; frame++) {
     const uint16_t progress = (uint16_t)(((uint32_t)frame * 65535) / (frames - 1));
     blank();
     animation->render(curved(curve, progress));
     present();
     delay(TICK_MS);
   }
+
+  // The last frame drawn was t == 65535 through a curve pinned there, so the
+  // buffer already holds this animation at the end of its run and freezing it
+  // costs no render.
+  outgoing = buffer;
+  haveOutgoing = true;
 }
 
 static void configure_led(void) {
