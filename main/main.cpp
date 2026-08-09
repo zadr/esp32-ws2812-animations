@@ -19,10 +19,10 @@
 #include "FillIn.hpp"
 #include "FlashWhite.hpp"
 #include "MultiRainbow.hpp"
-// #include "RainbowDichromatic.hpp"
+#include "RainbowDichromatic.hpp"
 #include "RainbowFull.hpp"
 #include "RainbowSingleColorSlice.hpp"
-#include "RainbowDichromatic.hpp"
+#include "TheaterChase.hpp"
 #include "Twinkle.hpp"
 
 // my helper functions
@@ -53,6 +53,8 @@ Bounce bounce(led_strip);
 Twinkle twinkle(led_strip);
 CellularAutomaton rule30(led_strip, 30);
 CellularAutomaton rule110(led_strip, 110);
+TheaterChase theaterChaseForward(led_strip, 3, true);
+TheaterChase theaterChaseBackward(led_strip, 3, false);
 
 // Named here rather than on Animation, since direction and the BlinkComplement
 // flags distinguish entries that share a class.
@@ -80,6 +82,8 @@ Entry animations[] = {
   {&blinkComplementAllHuesEvolution, "blink complement, all hues, evolving"},
   {&rule30, "rule 30"},
   {&rule110, "rule 110"},
+  {&theaterChaseForward, "theater chase fwd"},
+  {&theaterChaseBackward, "theater chase rev"},
 };
 
 static void configure_led(void) {
