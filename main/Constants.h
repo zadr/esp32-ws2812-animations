@@ -2,7 +2,7 @@
 #define CONSTANTS_H
 
 #define PIN_WS2812B 0 // D0 on the XIAO ESP32C6
-#define NUM_PIXELS 50
+#define NUM_PIXELS 100
 #define HUE_MAX 65535
 
 #define BRIGHTNESS_SCALE 0.66
