@@ -7,6 +7,14 @@
 
 #define BRIGHTNESS_SCALE 0.66
 
+// Red reads dimmer than green and blue as output falls, so its duty decays as
+// value raised to this rather than in step with theirs. Refitting the exponent
+// against each level the palette was tuned at scatters it from 0.33 to 0.92, so
+// the figure is the mean of the four sessions rather than any one of them. The
+// palette below was judged on the strip against this, so moving it moves the
+// palette.
+#define RED_RESPONSE 0.54
+
 // Absolute output level for a pixel, 0 to 255, which an animation may set above
 // or below the default as well as at it. 255ths cannot express BRIGHTNESS_SCALE
 // exactly, so the default lands on the nearest level below it.

@@ -8,7 +8,7 @@
 
 // Kept for the one animation that renders white directly and so cannot reach the
 // red compensation through the hue path.
-static const float RED_SCALE = sqrtf(BRIGHTNESS_SCALE);
+static const float RED_SCALE = powf(BRIGHTNESS_SCALE, RED_RESPONSE);
 
 // Saturation and value are pinned at full, which leaves one channel at 255, one
 // at 0, and one ramping across each sixth of the wheel.
@@ -20,7 +20,9 @@ static const float RED_SCALE = sqrtf(BRIGHTNESS_SCALE);
 //
 // Channels come out full scale at 65536 rather than 255, which is what the
 // position within the sector already measures, so the ramp needs no arithmetic
-// and carries no error into the level below.
+// of its own. color_utils weighs the dies against each other at that width; the
+// renderer brings it down to duty steps itself, where the quantisation is part
+// of what was tuned.
 static void hue_to_rgb16(uint16_t h, uint32_t &r, uint32_t &g, uint32_t &b) {
     const uint32_t scaled = (uint32_t)h * 6;
     const uint32_t rising = scaled % 65536;
@@ -36,30 +38,14 @@ static void hue_to_rgb16(uint16_t h, uint32_t &r, uint32_t &g, uint32_t &b) {
     }
 }
 
-// Red reads dimmer than green and blue as output falls, so it has to decay more
-// slowly than they do. Refitting that decay against each level the palette was
-// tuned at gives exponents scattered from 0.33 to 0.92, which does not resolve
-// finely enough to justify a tunable, so it is fixed at a square root. That costs
-// no pow, no float and no table: sqrt(value / 255) is isqrt(value * 255) / 255,
-// the geometric mean of the pixel's level and full output.
+// Red's decay across value, at RED_RESPONSE rather than in step with the other
+// two dies.
 //
-// The root is taken over the level shifted up by 16, so it comes back with eight
-// fractional bits rather than snapped to a whole duty step. The shifted level
-// peaks at 65025 << 16, just inside 32 bits, and its root at 255 << 8.
+// Eight fractional bits rather than a whole duty step, so the compensation still
+// resolves between adjacent values where an animation sweeps one. Full output is
+// 255 << 8, which is also the scale color_utils weighs the three dies on.
 static uint32_t red_level(uint8_t value) {
-    uint32_t remainder = ((uint32_t)value * 255) << 16;
-    uint32_t root = 0;
-
-    for (uint32_t bit = 1u << 30; bit != 0; bit >>= 2) {
-        if (remainder >= root + bit) {
-            remainder -= root + bit;
-            root = (root >> 1) + bit;
-        } else {
-            root >>= 1;
-        }
-    }
-
-    return root;
+    return (uint32_t)(255.0f * 256.0f * powf(value / 255.0f, RED_RESPONSE) + 0.5f);
 }
 
 // Several animations step in fixed blocks that overrun a strip length not
@@ -69,23 +55,30 @@ static uint32_t red_level(uint8_t value) {
 // Value is absolute rather than a fraction of the default, so an animation can
 // ask for more output than the default as well as less.
 //
-// Hue, level and root all stay at their full width to here and round to a duty
-// step once, at the end. Rounding at each stage instead would floor three times
-// over, and the three floors are independent rather than offsetting. The red
-// product peaks at 65536 * (255 << 8), which is inside 32 bits with room for the
-// rounding term.
+// The wheel comes to duty steps before value is applied, and both stages
+// truncate. That is load-bearing rather than incidental: of the four ways to
+// arrange those two roundings it is the only one that reproduces all seven tuned
+// hues, and three of them sit a step below what exact arithmetic gives, so no
+// single rounding at full width reaches them however it is taken. Violet's red
+// is exactly 174.996 and was approved at 174, which leaves the final stage no
+// room to be biased either.
+//
+// Divided by 255 rather than shifted by 8, since a channel at full has to come
+// through value unchanged.
 static void actual_led_strip_set_pixel_hsv(led_strip_handle_t strip, uint32_t index, uint16_t hue, uint8_t value = VALUE_DEFAULT) {
   if (index >= NUM_PIXELS) return;
 
   uint32_t r = 0; uint32_t g = 0; uint32_t b = 0;
   hue_to_rgb16(hue, r, g, b);
 
-  const uint32_t red = red_level(value);
+  r = (r * 255) >> 16;
+  g = (g * 255) >> 16;
+  b = (b * 255) >> 16;
 
   led_strip_set_pixel(strip, index,
-                      (r * red + (1u << 23)) >> 24,
-                      (g * value + (1u << 15)) >> 16,
-                      (b * value + (1u << 15)) >> 16);
+                      r * red_level(value) / (255 * 256),
+                      g * value / 255,
+                      b * value / 255);
 }
 
 #endif
