@@ -24,6 +24,7 @@
 #include "RainbowDichromatic.hpp"
 #include "RainbowFull.hpp"
 #include "RainbowSingleColorSlice.hpp"
+#include "Ripple.hpp"
 #include "TheaterChase.hpp"
 #include "Twinkle.hpp"
 
@@ -59,6 +60,7 @@ TheaterChase theaterChaseForward(led_strip, 3, true);
 TheaterChase theaterChaseBackward(led_strip, 3, false);
 Interference interference(led_strip);
 Collision collision(led_strip);
+Ripple ripple(led_strip);
 
 // Named here rather than on Animation, since direction and the BlinkComplement
 // flags distinguish entries that share a class.
@@ -90,6 +92,7 @@ Entry animations[] = {
   {&theaterChaseBackward, "theater chase rev"},
   {&interference, "interference"},
   {&collision, "collision"},
+  {&ripple, "ripple"},
 };
 
 static void configure_led(void) {
