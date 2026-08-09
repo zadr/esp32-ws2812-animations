@@ -6,13 +6,11 @@
 #include "esp_wifi.h"
 #include "sdkconfig.h"
 
-// idf libraries
-#include "led_strip.h"
-
 // my animations
 #include "Constants.h"
 #include "Curve.hpp"
 #include "Frame.hpp"
+#include "Strip.hpp"
 #include "BlinkComplement.hpp"
 #include "Bounce.hpp"
 #include "CellularAutomaton.hpp"
@@ -33,8 +31,6 @@
 
 // my helper functions
 #include "esp_random_max.h"
-
-static led_strip_handle_t led_strip;
 
 // One between all of them, since a single animation runs at a time and it is
 // handed a blank one.
@@ -225,21 +221,17 @@ static const int GROUP_COUNT = sizeof(groups) / sizeof(groups[0]);
 // frame identical to the one before it, which is 1.5ms of RMT on 50 pixels.
 static const int TICK_MS = 10;
 
-// led_strip_clear transmits as well as zeroing, so an animation reaching for it
-// puts a dark frame on the strip before every real one. Blanking is a statement
-// about the buffer rather than about the wire, so it belongs on this side of
-// render() next to the refresh, and an animation that lights part of the strip
-// no longer has to ask for the rest.
+// Blanking is a statement about the buffer and not about the wire, so it sits
+// on this side of render() next to the transmit. An animation that lights part
+// of the strip does not have to ask for the rest, and clearing never costs a
+// dark frame ahead of a real one.
 static void blank(void) {
   buffer.clear();
 }
 
 // The frame is what an animation drew; the wire gets it here and nowhere else.
 static void present(void) {
-  for (int i = 0; i < NUM_PIXELS; i++) {
-    led_strip_set_pixel(led_strip, i, buffer.rgb[i][0], buffer.rgb[i][1], buffer.rgb[i][2]);
-  }
-  led_strip_refresh(led_strip);
+  strip_transmit(buffer);
 }
 
 static void run(Animation* animation, const char* name) {
@@ -268,19 +260,12 @@ static void run(Animation* animation, const char* name) {
 }
 
 static void configure_led(void) {
-  led_strip_config_t strip_config = {};
-  strip_config.strip_gpio_num = PIN_WS2812B;
-  strip_config.max_leds = NUM_PIXELS;
-  strip_config.led_model = LED_MODEL_WS2812;
-  strip_config.color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB;
+  strip_start();
 
-  led_strip_rmt_config_t rmt_config = {};
-  rmt_config.clk_src = RMT_CLK_SRC_DEFAULT;
-  rmt_config.resolution_hz = 10 * 1000 * 1000;
-  rmt_config.flags.with_dma = false;
-
-  ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
-  led_strip_clear(led_strip);
+  // The strip holds its last frame across a reset of the board, so the first
+  // thing it is sent is a dark one.
+  blank();
+  present();
 }
 
 void single(void) {
