@@ -25,6 +25,7 @@
 #include "RainbowFull.hpp"
 #include "RainbowSingleColorSlice.hpp"
 #include "Ripple.hpp"
+#include "Sort.hpp"
 #include "TheaterChase.hpp"
 #include "Twinkle.hpp"
 
@@ -61,6 +62,20 @@ TheaterChase theaterChaseBackward(led_strip, 3, false);
 Interference interference(led_strip);
 Collision collision(led_strip);
 Ripple ripple(led_strip);
+Sort sortBitonicRainbow(led_strip, SortBitonic, SortRainbow);
+Sort sortBitonicSegment(led_strip, SortBitonic, SortSegment);
+Sort sortQuickRainbow(led_strip, SortQuick, SortRainbow);
+Sort sortQuickSegment(led_strip, SortQuick, SortSegment);
+Sort sortRadixRainbow(led_strip, SortRadix, SortRainbow);
+Sort sortRadixSegment(led_strip, SortRadix, SortSegment);
+Sort sortMergeRainbow(led_strip, SortMerge, SortRainbow);
+Sort sortMergeSegment(led_strip, SortMerge, SortSegment);
+Sort sortInsertionRainbow(led_strip, SortInsertion, SortRainbow);
+Sort sortInsertionSegment(led_strip, SortInsertion, SortSegment);
+Sort sortSelectionRainbow(led_strip, SortSelection, SortRainbow);
+Sort sortSelectionSegment(led_strip, SortSelection, SortSegment);
+Sort sortHeapRainbow(led_strip, SortHeap, SortRainbow);
+Sort sortHeapSegment(led_strip, SortHeap, SortSegment);
 
 // Named here rather than on Animation, since direction and the BlinkComplement
 // flags distinguish entries that share a class.
@@ -93,6 +108,20 @@ Entry animations[] = {
   {&interference, "interference"},
   {&collision, "collision"},
   {&ripple, "ripple"},
+  {&sortBitonicRainbow, "sort bitonic, rainbow"},
+  {&sortBitonicSegment, "sort bitonic, segment"},
+  {&sortQuickRainbow, "sort quick, rainbow"},
+  {&sortQuickSegment, "sort quick, segment"},
+  {&sortRadixRainbow, "sort radix, rainbow"},
+  {&sortRadixSegment, "sort radix, segment"},
+  {&sortMergeRainbow, "sort merge, rainbow"},
+  {&sortMergeSegment, "sort merge, segment"},
+  {&sortInsertionRainbow, "sort insertion, rainbow"},
+  {&sortInsertionSegment, "sort insertion, segment"},
+  {&sortSelectionRainbow, "sort selection, rainbow"},
+  {&sortSelectionSegment, "sort selection, segment"},
+  {&sortHeapRainbow, "sort heap, rainbow"},
+  {&sortHeapSegment, "sort heap, segment"},
 };
 
 static void configure_led(void) {
