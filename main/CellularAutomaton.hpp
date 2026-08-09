@@ -123,8 +123,6 @@ private:
   // single lit pixels in different colours; two tones stay coarse enough to read
   // as the boundary between the settled side of a pattern and the churning side.
   void draw(const Ring& ring, uint16_t base) const {
-    led_strip_clear(strip);
-
     const uint16_t settled = (base + HUE_SPAN / 8) % HUE_SPAN;
     const uint64_t held = ring.cells & ring.previous;
     for (uint16_t i = 0; i < NUM_PIXELS; i++) {

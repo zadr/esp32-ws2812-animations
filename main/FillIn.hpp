@@ -27,8 +27,6 @@ public:
     const int band = n / NUM_PIXELS;
     const int reached = n % NUM_PIXELS;
 
-    led_strip_clear(strip);
-
     const uint16_t filling = bandHue(band);
     for (int i = 0; i <= reached; i++) {
       actual_led_strip_set_pixel_hsv(strip, at(i), filling);

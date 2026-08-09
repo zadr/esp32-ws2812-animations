@@ -126,10 +126,20 @@ Entry animations[] = {
 // CONFIG_FREERTOS_HZ is 100, so vTaskDelay resolves to whole 10ms ticks and this
 // is the shortest interval the driver can actually hold. It is also the interval
 // the fastest animations already ran at, so nothing loses smoothness by moving
-// to a fixed tick; what the slower ones gain is a redundant refresh, which costs
-// 1.5ms of RMT transmit on 50 pixels and no arithmetic, since a render that
-// finds nothing changed leaves the buffer alone.
+// to a fixed tick; what the slower ones pay is a redraw and a transmit of a
+// frame identical to the one before it, which is 1.5ms of RMT on 50 pixels.
 static const int TICK_MS = 10;
+
+// led_strip_clear transmits as well as zeroing, so an animation reaching for it
+// puts a dark frame on the strip before every real one. Blanking is a statement
+// about the buffer rather than about the wire, so it belongs on this side of
+// render() next to the refresh, and an animation that lights part of the strip
+// no longer has to ask for the rest.
+static void blank(void) {
+  for (int i = 0; i < NUM_PIXELS; i++) {
+    led_strip_set_pixel(led_strip, i, 0, 0, 0);
+  }
+}
 
 static void run(Animation* animation, const char* name) {
   // setup() decides the run and duration() reports on what it decided, so the
@@ -149,6 +159,7 @@ static void run(Animation* animation, const char* name) {
   const Curve curve = animation->curve();
   for (int frame = 0; frame < frames; frame++) {
     const uint16_t progress = (uint16_t)(((uint32_t)frame * 65535) / (frames - 1));
+    blank();
     animation->render(curved(curve, progress));
     led_strip_refresh(led_strip);
     delay(TICK_MS);

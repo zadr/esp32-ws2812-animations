@@ -37,8 +37,6 @@ public:
     // Unlit gaps are the whole trick. Every pixel here is at the same output, so
     // filling the gaps with a contrasting hue would put the strip at full width
     // and leave the motion to read as a hue shimmer rather than running lights.
-    led_strip_clear(strip);
-
     for (int i = 0; i < NUM_PIXELS; i++) {
       const int position = i + phase;
       if (position % spacing != 0) {

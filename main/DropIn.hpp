@@ -70,8 +70,6 @@ private:
     // leading edge. That is the whole lit set, so it is rebuilt here rather
     // than accumulated in the buffer.
     void draw(int landed, int falling, uint16_t hue) const {
-      led_strip_clear(strip);
-
       for (int m = 0; m < landed; m++) {
         actual_led_strip_set_pixel_hsv(strip, m, hue);
       }

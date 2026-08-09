@@ -35,6 +35,10 @@ public:
     // An animation with no closed form for its state walks to it from the
     // opening state on every call, in locals. Nothing render() writes may
     // outlive the call that wrote it.
+    //
+    // Computing that state is all there is to do here. The strip arrives blank
+    // and goes out to the wire afterwards, both on the driver's side, so an
+    // animation lights the pixels it wants and neither clears nor refreshes.
     virtual void render(uint16_t t) = 0;
 
     virtual Curve curve() const { return CurveQuadraticInOut; }

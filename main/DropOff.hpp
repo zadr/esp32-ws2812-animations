@@ -26,8 +26,6 @@ public:
     const int band = n / restsPerBand();
     const int falling = NUM_PIXELS - 1 - (n % restsPerBand()) * chunk();
 
-    led_strip_clear(strip);
-
     const uint16_t hue = bandHue(band);
     for (int k = 0; k < chunk(); k++) {
       if (falling - k >= 0) {

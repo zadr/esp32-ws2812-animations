@@ -122,7 +122,6 @@ private:
   }
 
   void draw(const Travellers& pair) const {
-    led_strip_clear(strip);
     for (int i = 0; i < TRAVELLERS; i++) {
       actual_led_strip_set_pixel_hsv(strip, pixelOf(pair.position[i]), pair.hue[i]);
     }
