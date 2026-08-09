@@ -21,7 +21,7 @@ public:
     // constructed, so there is nothing here to decide and no entropy to draw.
     void setup() override {}
 
-    // A step moves the queue one pixel, so the run is a distance rather than a
+    // A step moves the tape one pixel, so the run is a distance rather than a
     // count.
     int duration() override { return SHIFTS * MS_PER_PIXEL; }
 
@@ -36,13 +36,13 @@ public:
     int tag() override { return 1007; }
 
 private:
-    // A pair holds the strip for NUM_PIXELS - 1 shifts and there are seven of
+    // A band crosses the strip in NUM_PIXELS - 1 shifts and there are seven of
     // them, so the run is a little over two laps of the palette.
     static const int SHIFTS = 720;
     static const int MS_PER_PIXEL = 20;
 
-    // One short of the strip, so a band has just crossed it when the next one
-    // starts.
+    // One short of the strip, so the window always spans a seam and carries two
+    // bands at once, which is the whole of the animation.
     static constexpr uint32_t BAND_LENGTH = NUM_PIXELS - 1;
 
     // Both ends stated per band rather than chained through a list of stops,
@@ -71,11 +71,14 @@ private:
     static constexpr uint32_t BANDS = sizeof(FORWARD) / sizeof(FORWARD[0]);
 
     // Which band a position falls in and how far into it are the same division.
+    // A band opens holding its first hue and the ramp fills what is left, so the
+    // second hue is only arrived at by the band that follows.
     uint16_t hueAt(uint32_t position) const {
         const uint16_t (*bands)[2] = forward ? FORWARD : BACKWARD;
         const uint16_t* band = bands[(position / BAND_LENGTH) % BANDS];
+        const uint32_t within = position % BAND_LENGTH;
 
-        return ramp(band[0], band[1], position % BAND_LENGTH);
+        return ramp(band[0], band[1], within == 0 ? 0 : within - 1);
     }
 
     // Quadratic in the distance across the band, so the arriving hue is crowded
@@ -83,11 +86,11 @@ private:
     // most of the band's length.
     //
     // Integer throughout: this core has no hardware float, and the widest
-    // product is a full wheel against the square of the band, well inside 32
+    // product is one hue against the square of the band length, well inside 32
     // bits.
-    static uint16_t ramp(uint16_t from, uint16_t to, uint32_t within) {
+    static uint16_t ramp(uint16_t from, uint16_t to, uint32_t across) {
         const int32_t span = (int32_t)to - (int32_t)from;
-        return (uint16_t)(from + span * (int32_t)(within * within) / (int32_t)(BAND_LENGTH * BAND_LENGTH));
+        return (uint16_t)(from + span * (int32_t)(across * across) / (int32_t)(BAND_LENGTH * BAND_LENGTH));
     }
 
     const bool forward;
