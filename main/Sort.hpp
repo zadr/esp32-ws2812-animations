@@ -35,16 +35,9 @@ public:
     : Animation(strip), algorithm(algorithm), dataset(dataset), delayMs(100), frame(0), cursor(0) {}
 
   void setup() override {
-    // A start the algorithm resolves in a handful of moves has nothing to watch,
-    // and pacing cannot stretch four frames into an animation. Deal again
-    // instead. Every algorithm clears the floor on some deal, so the attempt
-    // limit is a backstop rather than the usual exit.
-    for (int attempt = 0; attempt < 8; attempt++) {
-      buildKeys();
-      shuffle();
-      record();
-      if (recordCount >= MIN_OPS) break;
-    }
+    buildKeys();
+    shuffle();
+    record();
 
     delayMs = pace();
     frame = 0;
@@ -54,6 +47,9 @@ public:
   int steps() override { return introFrames() + recordCount + settleFrames(); }
 
   void loop() override {
+    int movedLow = -1;
+    int movedHigh = -1;
+
     if (frame >= introFrames() && cursor < recordCount) {
       const Op& op = operations[cursor];
       cursor++;
@@ -62,14 +58,21 @@ public:
         const uint8_t held = keys[op.a];
         keys[op.a] = keys[op.b];
         keys[op.b] = held;
+        movedHigh = op.b;
       } else {
         keys[op.a] = op.b;
       }
+      movedLow = op.a;
     }
     frame++;
 
-    for (uint16_t i = 0; i < NUM_PIXELS; i++) {
-      actual_led_strip_set_pixel_hsv(strip, i, keyHues[keys[i]]);
+    // The pixels this frame touched carry full output against the default the
+    // rest of the strip sits at. Hue alone cannot mark them: a segment spanning
+    // two anchors steps about one output level per pixel, so a moved pixel is
+    // indistinguishable from its neighbours by colour.
+    for (int i = 0; i < NUM_PIXELS; i++) {
+      const uint8_t value = (i == movedLow || i == movedHigh) ? 255 : VALUE_DEFAULT;
+      actual_led_strip_set_pixel_hsv(strip, i, keyHues[keys[i]], value);
     }
   }
 
@@ -96,10 +99,23 @@ private:
   // Insertion sort on a reversed strip is the ceiling at 1225 operations.
   // Recording stops at the bound and the replay ends part sorted.
   static const int MAX_OPS = 1400;
-  static const int MIN_OPS = 24;
 
   static const int TARGET_MS = 14000;
   static const int SLOWEST_MS = 400;
+
+  // A sixth of the wheel ramps one channel across 255 steps before the pixel
+  // value scales it down, so one output level is HUE_MAX / 6 / VALUE_DEFAULT
+  // hue units. A run narrower than a level per pixel gap renders with repeats
+  // and stops reading as ordered. This admits every anchor run except red to
+  // orange and blue to indigo, 1967 and 1476 units wide, which render as 30 and
+  // 27 distinct colours across the 50 pixels.
+  static const int MIN_SEGMENT_UNITS = (NUM_PIXELS - 1) * (HUE_MAX / 6 / VALUE_DEFAULT);
+
+  // Two passes over six key bits. An array sorted by a low digit is not sorted
+  // by value, so no digit width makes the passes before the last look ordered.
+  // Narrower digits only add passes that appear to do nothing.
+  static const int RADIX_BITS = 3;
+  static const int RADIX_BASE = 1 << RADIX_BITS;
 
   // The driver runs one animation to completion before starting the next, so
   // the recording scratch is shared rather than sized once per registration.
@@ -137,33 +153,40 @@ private:
   int settleFrames() const { return 2000 / delayMs; }
 
   void buildKeys() {
-    if (dataset == SortRainbow) {
-      // Stopping at violet rather than wrapping the wheel: a full turn returns
-      // to red and the sorted strip would end where it began.
-      for (int i = 0; i < NUM_PIXELS; i++) {
-        keyHues[i] = (uint16_t)((uint32_t)i * HUE_SPAN / (NUM_PIXELS - 1));
-        keys[i] = i;
-      }
-      return;
+    static const uint16_t anchors[] = {
+      HUE_RED, HUE_ORANGE, HUE_YELLOW, HUE_GREEN, HUE_BLUE, HUE_INDIGO, HUE_VIOLET
+    };
+    const int anchorCount = sizeof(anchors) / sizeof(anchors[0]);
+
+    int first = 0;
+    int span = anchorCount;
+    if (dataset == SortSegment) {
+      do {
+        span = esp_random_max(2) + 2;
+        first = esp_random_max(anchorCount - span);
+      } while (anchors[first + span - 1] - anchors[first] < MIN_SEGMENT_UNITS);
     }
 
-    // Orange sits close enough to red, and indigo to blue, that a block of one
-    // beside a block of the other reads as a single block.
-    static const uint16_t candidates[] = { HUE_RED, HUE_YELLOW, HUE_GREEN, HUE_BLUE, HUE_VIOLET };
-    const int candidateCount = sizeof(candidates) / sizeof(candidates[0]);
-
-    const int wanted = esp_random_max(2) + 2;
-    int chosen = 0;
-    for (int i = 0; i < candidateCount && chosen < wanted; i++) {
-      if (esp_random_max(candidateCount - i - 1) < (uint16_t)(wanted - chosen)) {
-        keyHues[chosen] = candidates[i];
-        chosen++;
-      }
-    }
-
-    // The leading run guarantees every block survives the shuffle.
+    // Stepping anchor to anchor rather than straight from the first hue number
+    // to the last. The palette is spaced by eye and the numbers between anchors
+    // are not, so giving each anchor interval an equal share of the pixels is
+    // what makes the ramp read evenly. It is also why the anchor count sets the
+    // width of a run: red to orange is 1967 units and yellow to green is 15684,
+    // but one anchor apart reads as one step of either.
+    const int intervals = span - 1;
     for (int i = 0; i < NUM_PIXELS; i++) {
-      keys[i] = i < wanted ? i : esp_random_max(wanted - 1);
+      const uint32_t reach = (uint32_t)i * intervals;
+      int step = reach / (NUM_PIXELS - 1);
+      uint32_t within = reach % (NUM_PIXELS - 1);
+      if (step >= intervals) {
+        step = intervals - 1;
+        within = NUM_PIXELS - 1;
+      }
+
+      const uint16_t low = anchors[first + step];
+      const uint16_t high = anchors[first + step + 1];
+      keyHues[i] = (uint16_t)(low + (uint32_t)(high - low) * within / (NUM_PIXELS - 1));
+      keys[i] = i;
     }
   }
 
@@ -176,11 +199,8 @@ private:
     }
   }
 
-  // A frame that changes no pixel reads as a stall, so operations the strip
-  // cannot show are dropped instead of queued. Swapping equal keys is one of
-  // them, which is why the duplicate-heavy segment data runs shorter.
   void recordSwap(int i, int j) {
-    if (i == j || work[i] == work[j]) return;
+    if (i == j) return;
 
     const uint8_t held = work[i];
     work[i] = work[j];
@@ -188,6 +208,9 @@ private:
     push(OpSwap, i, j);
   }
 
+  // Merge and radix write a whole range back, most of it already holding the
+  // value being written. A frame that changes no pixel reads as a stall, so
+  // those are dropped rather than queued.
   void recordSet(int i, uint8_t value) {
     if (work[i] == value) return;
 
@@ -222,35 +245,29 @@ private:
     }
   }
 
-  // Three way partition, so the segment data collapses in a pass or two instead
-  // of degrading on its duplicates. Recursion takes the shorter side, which
-  // holds the depth to about six frames of the 3.5KB main task stack.
+  // Hoare partition: the two ends walk inward and exchange across the pivot.
+  // Recursion takes the shorter side, which holds the depth to about six frames
+  // of the 3.5KB main task stack.
   void quickSort(int lo, int hi) {
     while (lo < hi) {
       const uint8_t pivot = work[(lo + hi) / 2];
-      int less = lo;
-      int i = lo;
-      int greater = hi;
+      int i = lo - 1;
+      int j = hi + 1;
 
-      while (i <= greater) {
-        if (work[i] < pivot) {
-          recordSwap(less, i);
-          less++;
-          i++;
-        } else if (work[i] > pivot) {
-          recordSwap(i, greater);
-          greater--;
-        } else {
-          i++;
-        }
+      for (;;) {
+        do { i++; } while (work[i] < pivot);
+        do { j--; } while (work[j] > pivot);
+        if (i >= j) break;
+
+        recordSwap(i, j);
       }
 
-      if (less - lo < hi - greater) {
-        quickSort(lo, less - 1);
-        lo = greater + 1;
+      if (j - lo < hi - j - 1) {
+        quickSort(lo, j);
+        lo = j + 1;
       } else {
-        quickSort(greater + 1, hi);
-        hi = less - 1;
+        quickSort(j + 1, hi);
+        hi = j;
       }
     }
   }
@@ -305,29 +322,27 @@ private:
     }
   }
 
-  // Two bit digits: the rainbow's fifty keys take three passes and the segment's
-  // two to four take one. That gap is the reason to show radix on both.
   void radixSort() {
     uint8_t largest = 0;
     for (int i = 0; i < NUM_PIXELS; i++) {
       if (work[i] > largest) largest = work[i];
     }
 
-    for (int shift = 0; (largest >> shift) > 0; shift += 2) {
-      int offset[4] = { 0, 0, 0, 0 };
+    for (int shift = 0; (largest >> shift) > 0; shift += RADIX_BITS) {
+      int offset[RADIX_BASE] = { 0 };
       for (int i = 0; i < NUM_PIXELS; i++) {
-        offset[(work[i] >> shift) & 3]++;
+        offset[(work[i] >> shift) & (RADIX_BASE - 1)]++;
       }
 
       int total = 0;
-      for (int digit = 0; digit < 4; digit++) {
+      for (int digit = 0; digit < RADIX_BASE; digit++) {
         const int count = offset[digit];
         offset[digit] = total;
         total += count;
       }
 
       for (int i = 0; i < NUM_PIXELS; i++) {
-        const int digit = (work[i] >> shift) & 3;
+        const int digit = (work[i] >> shift) & (RADIX_BASE - 1);
         scratch[offset[digit]] = work[i];
         offset[digit]++;
       }
