@@ -52,36 +52,31 @@ private:
     static const int MS_PER_POSITION = 25;
 
     // One relationship for the whole run, so the colours that arrive have a
-    // reason to be seen together and the run is as long as what it drew.
+    // reason to be seen together and the run is as long as what it drew. Either
+    // the palette's neighbours around an anchor or an even division of the wheel
+    // from one, and a single colour is the division with one member rather than
+    // a case of its own.
     //
-    // The rotation is drawn once and applied to every anchor rather than per
-    // colour, since a drift of up to a third of the wheel taken separately would
-    // leave nothing of the relationship. A member computed from a rotated anchor
-    // is as exact as one computed from the anchor, and a run of anchors rotated
-    // together keeps the spacing it was tuned with.
+    // Drift is taken on the hue handed to spread rather than on the members it
+    // answers with. Up to a third of the wheel is further than the members are
+    // apart, so taken per member there would be no division left. The palette
+    // window takes none at all: off the anchors it is no longer the palette
+    // saying which hues are neighbours.
     int chooseShades(Shade out[MAX_BANDS]) const {
-      const uint8_t amount = esp_random_max(30);
-      const uint32_t direction = esp_random();
+      const uint16_t anchor = ANCHORS[esp_random_max(ANCHOR_COUNT - 1)];
       const int count = esp_random_max(MAX_BANDS - 1) + 1;
 
       // Levelling brings a set down to its dimmest member, and the more members
-      // it has the further that reaches, so the ceiling comes up to meet a triad
-      // rather than the triad running at a fraction of what a pair does.
+      // it has the further that reaches, so the ceiling comes up to meet a set
+      // of three rather than it running at a fraction of what a pair does.
       const uint8_t ceiling = count == MAX_BANDS ? 255 : VALUE_DEFAULT;
 
-      // Adjacent anchors are the relationship that is not a division of the
-      // wheel, the palette being spaced by eye rather than by angle, so they are
-      // levelled where they are rather than through spread.
       if (count > 1 && esp_random_max(1) == 0) {
-        const int first = esp_random_max(ANCHOR_COUNT - count);
-        for (int i = 0; i < count; i++) {
-          out[i].hue = driftBy(ANCHORS[first + i], amount, direction);
-        }
-        level(out, count, ceiling);
+        analogous(anchor, count, out, ceiling);
         return count;
       }
 
-      spread(driftBy(ANCHORS[esp_random_max(ANCHOR_COUNT - 1)], amount, direction), count, out, ceiling);
+      spread(driftBy(anchor, esp_random_max(30), esp_random()), count, out, ceiling);
       return count;
     }
 
