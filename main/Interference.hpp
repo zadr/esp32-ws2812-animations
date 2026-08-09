@@ -18,19 +18,31 @@ static const uint16_t INTERFERENCE_PIXEL_STEP_SHORT = 5303;
 
 // Deliberately not in the ratio of the wavelengths. Matching ratios give both
 // waves the same phase velocity and the whole figure, envelope included, slides
-// along rigidly. These have the carriers running down the strip at 8 and 3.3
-// pixels per second while the envelope crawls up it at 4.4.
+// along rigidly. These have the carriers running down the strip at a mean 8 and
+// 3.3 pixels per second while the envelope crawls up it at 4.4, all three scaled
+// by whatever rate the curve is holding at that point in the run.
 static const uint16_t INTERFERENCE_FRAME_STEP_LONG = 1049;
 static const uint16_t INTERFERENCE_FRAME_STEP_SHORT = 691;
 
+// Amplitude is value, and hue holds still for the whole run. Amplitude spent on
+// hue instead reads as a colour gradient travelling along the strip, which is a
+// rainbow: the nodes and antinodes are all still in it, and not one of them
+// reads as loud or quiet.
 class Interference : public Animation {
 public:
   Interference(led_strip_handle_t& strip)
-    : Animation(strip), setupPhaseLong(0), setupPhaseShort(0) {
+    : Animation(strip), hue(HUE_GREEN), setupPhaseLong(0), setupPhaseShort(0) {
   }
   ~Interference() {}
 
+  // Red is compensated by a square root of the level, so it decays more slowly
+  // than green and blue and any hue holding red turns toward it on the way down:
+  // at a tenth of full output red stands 3.1 times higher against them than it
+  // does at full. From the green anchor to the blue one the red channel is zero
+  // outright, which is the only arc a fade to black crosses without turning, and
+  // the nodes here are for fading to black.
   void setup() override {
+    hue = (uint16_t)(HUE_GREEN + esp_random_max(HUE_BLUE - HUE_GREEN));
     setupPhaseLong = esp_random_max(HUE_MAX);
     setupPhaseShort = esp_random_max(HUE_MAX);
   }
@@ -56,31 +68,43 @@ private:
   static const int STEPS = 500;
   static const int MS_PER_STEP = 40;
 
+  // Two waves are summed where they are amplitudes and nowhere else. Two hue
+  // angles cannot be added at all: both wrap, their sum wraps twice as often,
+  // and a seam lands wherever either one rolls over.
   void draw(uint16_t phaseLong, uint16_t phaseShort) const {
-    // Two hue angles cannot be added: both wrap, and their sum wraps twice as
-    // often, which puts a hard seam wherever either one rolls over and reads as
-    // noise. The waves are summed as amplitudes instead and the result mapped
-    // across the palette afterwards, so the only discontinuity is the one at the
-    // ends of the span, which nothing reaches.
-    //
-    // Amplitude then has nowhere to go but hue, since every pixel is at the same
-    // output. Spending the whole tuned span on it is what makes the beat legible:
-    // the antinodes sweep red to violet, the nodes cancel to a flat green blue,
-    // and a narrower window would leave the two indistinguishable at this length.
-    const float huePerUnit = HUE_VIOLET / 4.0f; // the sum runs -2 to 2
-
     for (uint16_t i = 0; i < NUM_PIXELS; i++) {
-      float sum = wave((uint16_t)(INTERFERENCE_PIXEL_STEP_LONG * i + phaseLong))
-                + wave((uint16_t)(INTERFERENCE_PIXEL_STEP_SHORT * i + phaseShort));
+      const float sum = wave((uint16_t)(INTERFERENCE_PIXEL_STEP_LONG * i + phaseLong))
+                      + wave((uint16_t)(INTERFERENCE_PIXEL_STEP_SHORT * i + phaseShort));
 
-      actual_led_strip_set_pixel_hsv(strip, i, (uint16_t)((sum + 2.0f) * huePerUnit));
+      actual_led_strip_set_pixel_hsv(strip, i, hue, level(sum));
     }
+  }
+
+  // Rectified, which is what an exposure of two waves records and what leaves a
+  // node dark: the sign belongs to the carrier, and the envelope survives the
+  // fold whole.
+  //
+  // The bottom of the duty range is coarse, stepping visibly under 32 and
+  // reading as discrete stops under 8, and a node reaching black has to cross
+  // it. It is crossed at the carrier's zero, where a pixel is moving through the
+  // range at its fastest and holds no level long enough to show a step. A floor
+  // would keep every pixel clear of the coarse end at the cost of the dark that
+  // the nodes are.
+  //
+  // Value is absolute, so the antinodes stand above the strip's default rather
+  // than being fitted under it. A rectified pair of sines averages 8/pi squared
+  // of unit amplitude, which puts the strip at a mean 103 of 255 against the 168
+  // an animation at the default holds everywhere.
+  static uint8_t level(float sum) {
+    const float amplitude = sum < 0.0f ? -sum : sum;
+    return (uint8_t)(amplitude * (255.0f / 2.0f) + 0.5f);
   }
 
   static float wave(uint16_t phase) {
     return sinf(phase * (6.28318531f / 65536.0f));
   }
 
+  uint16_t hue;
   uint16_t setupPhaseLong;
   uint16_t setupPhaseShort;
 };
