@@ -42,6 +42,8 @@ FullRainbow fullRainbowForward(led_strip, true);
 FullRainbow fullRainbowBackward(led_strip, false);
 RainbowSingleColorSlice rainbowSliceForward(led_strip, true);
 RainbowSingleColorSlice rainbowSliceBackward(led_strip, false);
+RainbowDichromatic rainbowDichromaticForward(led_strip, true);
+RainbowDichromatic rainbowDichromaticBackward(led_strip, false);
 MultiRainbow multiRainbowForwards(led_strip, true);
 MultiRainbow multiRainbowBackwards(led_strip, false);
 DropIn dropInForward(led_strip, true);
@@ -89,6 +91,8 @@ Entry animations[] = {
   {&fullRainbowBackward, "full rainbow rev"},
   {&rainbowSliceForward, "rainbow slice fwd"},
   {&rainbowSliceBackward, "rainbow slice rev"},
+  {&rainbowDichromaticForward, "dichromatic rainbow fwd"},
+  {&rainbowDichromaticBackward, "dichromatic rainbow rev"},
   {&dropInForward, "drop in"},
   {&dropOffForward, "drop off"},
   {&fillInForward, "fill in fwd"},
