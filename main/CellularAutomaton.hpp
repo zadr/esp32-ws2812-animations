@@ -20,9 +20,12 @@ class CellularAutomaton : public Animation {
 public:
   // Rule 0 leaves nothing alive, so it can stand for no pin at all.
   CellularAutomaton(Frame& strip, uint8_t pinned = 0)
-    : Animation(strip), pinned(pinned), rule(0), seed(0), seedCell(0), seedHue(0) {}
+    : Animation(strip), pinned(pinned), rule(0), seed(0), seedCell(0), seedHue(0), walkedTo(UNWALKED) {}
 
   void setup() override {
+    // A new rule and a new opening, so what was walked belongs to the last run.
+    walkedTo = UNWALKED;
+
     rule = pinned ? pinned : pick();
     ESP_LOGI("animation", "Cellular automaton rule %d", rule);
 
@@ -38,15 +41,23 @@ public:
   int duration() override { return RUN_MS; }
 
   void render(uint16_t t) override {
-    Ring ring = opening();
-
     const int generations = stepsAt(t, GENERATIONS);
-    for (int generation = 0; generation < generations; generation++) {
-      advance(ring, generation);
+
+    // A generation follows from the one before it and from its own index, so a
+    // walk that stops can be picked up where it stopped and lands where a walk
+    // from the opening would have. Only a t behind what is held has to start
+    // over, since a generation cannot be run backwards.
+    if (walkedTo > generations || walkedTo == UNWALKED) {
+      walked = opening();
+      walkedTo = 0;
+    }
+    while (walkedTo < generations) {
+      advance(walked, walkedTo);
+      walkedTo++;
     }
 
     // The sweep has no state to walk, so it comes straight off t.
-    draw(ring, (uint16_t)((seedHue + (uint32_t)t * HUE_SPAN / 65536) % HUE_SPAN));
+    draw(walked, (uint16_t)((seedHue + (uint32_t)t * HUE_SPAN / 65536) % HUE_SPAN));
   }
 
   int tag() override { return 1013; }
@@ -73,8 +84,9 @@ private:
   static constexpr int HISTORY = 32;
   static constexpr uint64_t VACANT = ~0ULL; // sits outside RING, so it matches nothing
 
-  // Everything that moves during a run, held as a local of render() so that
-  // walking to one generation leaves nothing behind for the next call to find.
+  // Everything that moves during a run. Whole, so that a Ring plus the number
+  // of generations standing in it is the entire walk and nothing else has to be
+  // carried alongside it to resume.
   struct Ring {
     uint64_t cells;
     uint64_t previous;
@@ -204,11 +216,19 @@ private:
     remember(ring, ring.cells);
   }
 
+  static constexpr int UNWALKED = -1;
+
   const uint8_t pinned;
   uint8_t rule;
   uint32_t seed;
   uint16_t seedCell;
   uint16_t seedHue;
+
+  // How far the run has been walked, and where it got to. Read only through
+  // render(), which either extends the walk or throws it away and starts again,
+  // so what the strip shows still depends on t alone.
+  Ring walked;
+  int walkedTo;
 };
 
 #endif
