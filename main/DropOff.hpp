@@ -37,15 +37,15 @@ public:
   int tag() override { return 1012; }
 
 private:
-    static const int BANDS = 7;
+    // The whole palette, a band each. A band here is one block falling rather
+    // than a fill of sweeps, so seven of them run for seconds where seven of
+    // DropIn's run for minutes, which is why that one draws a related few
+    // instead.
+    static const int BANDS = ANCHOR_COUNT;
 
     // What the block holds at each place it lands, so the descent keeps its
     // pace on a strip long enough to widen the chunk.
     static const int MS_PER_POSITION = 50;
-
-    static constexpr uint16_t ANCHORS[BANDS] = {
-      HUE_RED, HUE_ORANGE, HUE_YELLOW, HUE_GREEN, HUE_BLUE, HUE_INDIGO, HUE_VIOLET,
-    };
 
     // Chunk scales with strip length but never reaches zero, which on a short
     // strip would make the descent stop advancing.
