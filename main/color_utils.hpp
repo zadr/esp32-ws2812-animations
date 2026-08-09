@@ -28,12 +28,20 @@ struct ShadePair {
 
 // Hue is a full 16-bit wheel, so the narrowing conversion is the wrap: an
 // offset past either end comes back around the other side.
-static uint16_t drift(uint16_t hue, uint8_t amount) {
+//
+// The caller supplies which way it goes, so a step inside a run can drift the
+// same way every time it is walked through by handing in a hash of its own index
+// rather than fresh entropy.
+static uint16_t driftBy(uint16_t hue, uint8_t amount, uint32_t entropy) {
     int32_t offset = (amount / 100.0) * HUE_MAX;
-    if (esp_random() % 2 == 0) {
+    if (entropy % 2 == 0) {
         offset = -offset;
     }
     return (uint16_t)(hue + offset);
+}
+
+static uint16_t drift(uint16_t hue, uint8_t amount) {
+    return driftBy(hue, amount, esp_random());
 }
 
 // Half the wheel, which is exactly the channel-wise inverse of the colour: three
