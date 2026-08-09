@@ -23,18 +23,17 @@ public:
 
   int duration() override { return BLINKS * MS_PER_BLINK; }
 
-  // Swapping alone would be the parity of the blink count, but a drifted pair is
-  // reachable only through the drifts before it, so both variants walk and only
-  // the evolving one finds anything in advance() beyond the exchange.
+  // The swap alone would be the parity of the blink count, but where a drift has
+  // got to is reachable only through the drifts before it, so both variants walk.
   void render(uint16_t t) override {
-    Pair pair = opening();
+    Hues hues = opening();
 
     const int blinks = stepsAt(t, BLINKS);
     for (int blink = 0; blink < blinks; blink++) {
-      advance(pair, blink);
+      advance(hues, blink);
     }
 
-    draw(pair);
+    draw(hues);
   }
 
   int tag() override { return 1000; }
@@ -56,20 +55,20 @@ private:
 
   // Where the two hues have got to, held as a local of render() so that walking
   // to one blink leaves nothing behind for the next call to find.
-  struct Pair {
+  struct Hues {
     uint16_t primary;
     uint16_t secondary;
   };
 
-  Pair opening() const {
-    return Pair{primaryHue, secondaryHue};
+  Hues opening() const {
+    return Hues{primaryHue, secondaryHue};
   }
 
-  void advance(Pair& pair, int blink) const {
+  void advance(Hues& hues, int blink) const {
     // the exchange is the blink: each step lands the opposite hue on each block
-    const uint16_t held = pair.primary;
-    pair.primary = pair.secondary;
-    pair.secondary = held;
+    const uint16_t held = hues.primary;
+    hues.primary = hues.secondary;
+    hues.secondary = held;
 
     if (!evolves) {
       return;
@@ -79,13 +78,13 @@ private:
     // than sliding around the wheel together.
     const uint32_t direction = noise(seed, blink, LANE_DIRECTION);
     if (noise(seed, blink, LANE_WHICH) % 2 == 0) {
-      pair.primary = driftBy(pair.primary, 3, direction);
+      hues.primary = driftBy(hues.primary, 3, direction);
     } else {
-      pair.secondary = driftBy(pair.secondary, 3, direction);
+      hues.secondary = driftBy(hues.secondary, 3, direction);
     }
   }
 
-  void draw(const Pair& pair) const {
+  void draw(const Hues& hues) const {
     // Nominally 4 secondary then 4 primary, but the count of alternations is
     // taken from the strip and the bands stretch to fill it, so a strip that 8
     // does not divide gets slightly wider bands rather than a short one at the
@@ -96,7 +95,7 @@ private:
     for (int band = 0; band < bands; band++) {
       const int begin = (band * NUM_PIXELS) / bands;
       const int end = ((band + 1) * NUM_PIXELS) / bands;
-      const uint16_t hue = band % 2 == 0 ? pair.secondary : pair.primary;
+      const uint16_t hue = band % 2 == 0 ? hues.secondary : hues.primary;
 
       for (int j = begin; j < end; j++) {
         actual_led_strip_set_pixel_hsv(strip, j, hue);
