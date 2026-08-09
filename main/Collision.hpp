@@ -13,7 +13,7 @@
 // either lit or it is not.
 class Collision : public Animation {
 public:
-  Collision(led_strip_handle_t& strip) : Animation(strip), frame(0) {
+  Collision(led_strip_handle_t& strip) : Animation(strip), rest(0), frame(0) {
     for (int i = 0; i < TRAVELLERS; i++) {
       position[i] = 0;
       velocity[i] = 0;
@@ -45,16 +45,24 @@ public:
     }
 
     // A whole unit of friction every frame would strand the slowest traveller
-    // within a few pixels of its launch, so it bites on a period instead.
+    // within a few pixels of its launch, so it bites on a period instead. The
+    // period is long enough that friction never stops a traveller that is still
+    // finding collisions; what stops one is the run of collisions itself, and
+    // friction only closes out what they have already emptied.
     if (++frame % FRICTION_PERIOD == 0) {
       for (int i = 0; i < TRAVELLERS; i++) {
         applyFriction(i);
       }
     }
 
-    // One traveller at rest is not an empty strip, it is an obstacle for the
-    // other to run into. Only a pair at rest is out of moves.
-    if (velocity[0] == 0 && velocity[1] == 0) {
+    // One traveller at rest is an obstacle for the other to run into, which is
+    // worth keeping, so rest is budgeted rather than ended on sight. Counting
+    // traveller frames rather than frames spends a pair that stopped together
+    // twice as fast as a lone obstacle waiting to be hit, and the budget is per
+    // throw, so no throw can go quiet for longer than REST_LIMIT however the
+    // stillness arrives.
+    rest += (velocity[0] == 0) + (velocity[1] == 0);
+    if (rest >= REST_LIMIT) {
       launch();
     }
 
@@ -73,11 +81,22 @@ public:
 private:
   static const int TRAVELLERS = 2;
   static const int32_t SUBPIXEL = 256;
-  static const int32_t SPEED_MIN = 96;
-  static const int32_t SPEED_MAX = 320;
+  static const int32_t SPEED_MIN = 128;
+  static const int32_t SPEED_MAX = 384;
   static const int32_t FRICTION = 1;
-  static const int32_t FRICTION_PERIOD = 3;
+  static const int32_t FRICTION_PERIOD = 6;
   static const int32_t RESTITUTION_ONE = 256;
+
+  // Breakaway speed. Coulomb friction takes the same bite whatever the speed, so
+  // the last stretch before zero is a crawl of one pixel every several frames
+  // that reads as nothing happening and is too slow to reach the other
+  // traveller. Static friction is the honest way to cut it: below this the body
+  // is at rest, and at eight frames to the pixel there is nothing to see lost.
+  static const int32_t STOP_SPEED = 32;
+
+  // Traveller frames of stillness a single throw is allowed before the pair is
+  // thrown again.
+  static const int32_t REST_LIMIT = 90;
 
   // Speed difference at which a collision goes fully inelastic. Below it the two
   // deform each other and rebound; above it the impact goes into hauling the
@@ -103,6 +122,7 @@ private:
   }
 
   void launch() {
+    rest = 0;
     position[0] = 0;
     position[1] = (NUM_PIXELS - 1) * SUBPIXEL;
     velocity[0] = randomSpeed();
@@ -133,12 +153,12 @@ private:
   }
 
   void applyFriction(int i) {
-    if (velocity[i] > FRICTION) {
-      velocity[i] -= FRICTION;
-    } else if (velocity[i] < -FRICTION) {
-      velocity[i] += FRICTION;
-    } else {
+    if (magnitude(velocity[i]) <= STOP_SPEED) {
       velocity[i] = 0;
+    } else if (velocity[i] > 0) {
+      velocity[i] -= FRICTION;
+    } else {
+      velocity[i] += FRICTION;
     }
   }
 
@@ -178,6 +198,7 @@ private:
   int32_t position[TRAVELLERS];
   int32_t velocity[TRAVELLERS];
   uint16_t hue[TRAVELLERS];
+  int32_t rest;
   uint32_t frame;
 };
 
