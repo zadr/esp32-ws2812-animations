@@ -5,203 +5,148 @@
 #include "Constants.h"
 #include "actual_led_strip_set_pixel_hsv.h"
 #include "esp_random.h"
+#include "esp_random_max.h"
+#include <stdint.h>
 
-// hue_to_rgb pins saturation and value, but not luminance: a hue sitting on a
-// primary drives one channel, a hue between two drives two, so the strip holds
-// close to a two to one range at full value. Red through yellow crosses that
-// range without leaving the warm end of the wheel, and blue through cyan crosses
-// it without leaving the cool end. That band is the energy of a front here,
-// since there is no brightness for it to give up.
+// Still water at one hue and one low level, and a front is a displacement above
+// it. Amplitude is the only thing that varies, which is what a ripple is; the
+// hue band this used to spend energy on was a way of saying that without a
+// per-pixel value to say it with.
 //
-// Each band is paired against the primary that shares none of its channels, so
-// even a spent front stays unmistakable against the medium it crosses. A
-// background near the front on the wheel would be invisible: adjacent hues at
-// pinned saturation differ only in the ramp of a single channel.
+// The hue comes from green through blue because that is the only arc of the
+// wheel with no red in it: r is zero from 21846 to 43690 and the two anchors sit
+// inside. Red's duty is the square root of the level, so a hue carrying any red
+// turns toward red as it dims, about three times higher against the other two
+// dies at a tenth of full output. A front anywhere else would spend its fade
+// changing colour, which is the coupling of hue to energy this was rebuilt to be
+// rid of. Water is that arc anyway.
 class Ripple : public Animation {
 public:
-  Ripple(led_strip_handle_t& strip)
-    : Animation(strip), backgroundHue(HUE_BLUE), bandSpent(HUE_RED), bandFull(HUE_YELLOW), seed(0) {
-  }
+  Ripple(led_strip_handle_t& strip) : Animation(strip), hue(HUE_BLUE), seed(0) {}
 
   void setup() override {
-    if (esp_random() % 2 == 0) {
-      backgroundHue = HUE_BLUE;
-      bandSpent = HUE_RED;
-      bandFull = HUE_YELLOW;
-    } else {
-      backgroundHue = HUE_RED;
-      bandSpent = HUE_BLUE;
-      bandFull = (HUE_GREEN + HUE_BLUE) / 2;
-    }
-
+    hue = (uint16_t)(HUE_GREEN + esp_random_max(HUE_BLUE - HUE_GREEN));
     seed = esp_random();
   }
 
   int duration() override { return STEPS * MS_PER_PIXEL; }
 
-  // Impulses land at random positions on a period and a front carries the energy
-  // the ends have left it, so there is no expression for the strip at t and it is
-  // walked to from the opening state instead. The walk is in a local, so the same
-  // t always arrives at the same fronts.
-  void render(uint16_t t) override {
-    State state = opening();
+  // Speed belongs to the medium, so the run cannot be eased: a curve that holds
+  // at the ends and runs at twice the rate through the middle is a change in how
+  // fast water carries a wave. It opens and closes at rest without one, since
+  // the first impulse lands on still water and the last is given its whole life
+  // before the run is out.
+  Curve curve() const override { return CurveLinear; }
 
-    const int steps = stepsAt(t, STEPS);
-    for (int step = 0; step < steps; step++) {
-      advance(state, step);
+  // An impulse is a birth step and a position, and the step index gives both. A
+  // front's place and what is left of it then follow from the distance it has
+  // run, so nothing here is integrated and there is no walk.
+  void render(uint16_t t) override {
+    uint16_t canvas[NUM_PIXELS] = {};
+
+    const int step = stepsAt(t, STEPS);
+    for (uint32_t impulse = 0; impulse < IMPULSES; impulse++) {
+      const int born = (int)impulse * IMPULSE_PERIOD;
+      if (born > step) {
+        break;
+      }
+
+      const int at = (int)noiseMax(seed, impulse, 0, NUM_PIXELS - 1);
+      deposit(canvas, at, 1, step - born);
+      deposit(canvas, at, -1, step - born);
     }
 
-    draw(state);
+    draw(canvas);
   }
 
   int tag() override { return 1014; }
 
 private:
-  static const int MAX_FRONTS = 6;
-  static const int IMPULSE_PERIOD = 90;
-  static const int8_t ENERGY_FULL = 3;
-  static const int8_t MEDIUM = -1;
+  // Pixels between the two ends, which is what a front crosses and what it
+  // reflects between.
+  static constexpr int LENGTH = NUM_PIXELS - 1;
 
-  // Eight impulses at the period they are spaced by. A front covers a pixel a
-  // step, so the step is stated as the speed of the medium, which is what was
-  // tuned.
-  static const int IMPULSES = 8;
-  static const int STEPS = IMPULSE_PERIOD * IMPULSES;
-  static const int MS_PER_PIXEL = 20;
+  // The two add to full output, so the crest of a fresh impulse is the brightest
+  // the strip goes and everything else is measured down from it.
+  static constexpr int MEDIUM_VALUE = 16;
+  static constexpr int PEAK = 255 - MEDIUM_VALUE;
 
-  struct Front {
-    int16_t position;
-    int8_t direction;
-    int8_t energy;
-    bool alive;
-  };
+  // Where a front is retired rather than faded through. A fade steps visibly
+  // below about 32 duty and reads as a run of discrete stops below 8, so the
+  // stretch from here to nothing is four or five of them however it is written.
+  // One disappearance is better than that, and it happens at three times the
+  // medium, which reads as the front breaking rather than guttering.
+  static constexpr int MIN_AMPLITUDE = 32;
 
-  // Everything a step changes. It lives in render(), so no two renders can see
-  // each other's fronts.
-  struct State {
-    Front fronts[MAX_FRONTS];
-  };
+  // A pixel of travel costs one and a reflection costs thirty, which puts about
+  // a third of a front's life on the two ends and the rest on the water. One
+  // currency because it is one quantity: what reaches the eye is what has not
+  // gone somewhere else.
+  static constexpr int SPREAD_LOSS = 1;
+  static constexpr int REFLECTION_LOSS = 30;
 
-  // Still water. The first step is what disturbs it.
-  State opening() const { return State{}; }
+  // The longest a front can last. Its first end is at most LENGTH away and there
+  // is one every LENGTH after that, so by three lengths it has reflected at
+  // least twice and the peak does not cover that.
+  static constexpr int MAX_LIFETIME = 3 * LENGTH + 1;
+  static_assert(PEAK - MAX_LIFETIME * SPREAD_LOSS - 2 * REFLECTION_LOSS < MIN_AMPLITUDE,
+                "a front outlives the tail the run leaves for it");
 
-  void advance(State& state, int step) const {
-    if (step % IMPULSE_PERIOD == 0) {
-      impulse(state, step);
-    }
+  static constexpr uint32_t IMPULSES = 9;
+  static constexpr int IMPULSE_PERIOD = 70;
 
-    for (int i = 0; i < MAX_FRONTS; i++) {
-      advance(state.fronts[i]);
-    }
-  }
+  // The last impulse gets its whole life inside the run, so the water is still
+  // at both ends of it.
+  static constexpr int STEPS = ((int)IMPULSES - 1) * IMPULSE_PERIOD + MAX_LIFETIME;
 
-  // The step index is what the position is drawn against, so the impulse of step
-  // 90 is in the same place however many times the walk passes through it.
-  void impulse(State& state, int step) const {
-    int first = -1;
-    int second = -1;
-    for (int i = 0; i < MAX_FRONTS; i++) {
-      if (state.fronts[i].alive) {
-        continue;
-      }
-      if (first < 0) {
-        first = i;
-        continue;
-      }
-      second = i;
-      break;
-    }
+  // A front covers a pixel a step, so the step is the speed of the medium rather
+  // than a frame interval: a length of strip in a second.
+  static constexpr int MS_PER_PIXEL = 20;
 
-    // An impulse is a pair, so a lone free slot is no use to it.
-    if (second < 0) {
+  // The reflected path is the triangle the unfolded one traces, and the count of
+  // reflections is the count of ends reached, which is the first and then one
+  // every length.
+  void deposit(uint16_t canvas[], int at, int direction, int travelled) const {
+    const int toFirstEnd = direction > 0 ? LENGTH - at : at;
+    const int reflections = travelled > toFirstEnd
+                          ? 1 + (travelled - toFirstEnd - 1) / LENGTH
+                          : 0;
+
+    const int amplitude = PEAK - travelled * SPREAD_LOSS - reflections * REFLECTION_LOSS;
+    if (amplitude < MIN_AMPLITUDE) {
       return;
     }
 
-    const int16_t at = (int16_t)noiseMax(seed, step, 0, NUM_PIXELS - 1);
-    start(state.fronts[first], at, -1);
-    start(state.fronts[second], at, 1);
+    const int period = 2 * LENGTH;
+    const int unfolded = at + direction * travelled;
+    const int wrapped = ((unfolded % period) + period) % period;
+    const int position = wrapped <= LENGTH ? wrapped : period - wrapped;
+
+    // A crest with shoulders. One pixel has no shape to it and three is as wide
+    // as fifty holds while the front still crosses them in a second. The
+    // shoulders fold at the ends the way the crest does, so a front arriving at
+    // a wall piles onto it rather than losing half of itself over the edge.
+    raise(canvas, position, amplitude);
+    raise(canvas, position - 1, amplitude / 2);
+    raise(canvas, position + 1, amplitude / 2);
   }
 
-  static void start(Front& front, int16_t at, int8_t direction) {
-    front.position = at;
-    front.direction = direction;
-    front.energy = ENERGY_FULL;
-    front.alive = true;
+  static void raise(uint16_t canvas[], int at, int amplitude) {
+    const int folded = at < 0 ? -at : (at > LENGTH ? 2 * LENGTH - at : at);
+    canvas[folded] += (uint16_t)amplitude;
   }
 
-  // Every front moves one pixel a step. Speed belongs to the medium rather than
-  // to whatever disturbed it, which is also why two fronts share a pixel and
-  // come out the far side unchanged.
-  //
-  // Ends reflect, and the boundary is the only thing that takes energy. A front
-  // that arrives already spent has nothing left to give it and is done.
-  static void advance(Front& front) {
-    if (!front.alive) {
-      return;
-    }
-
-    front.position += front.direction;
-    if (front.position < 0) {
-      front.position = -front.position;
-    } else if (front.position > NUM_PIXELS - 1) {
-      front.position = 2 * (NUM_PIXELS - 1) - front.position;
-    } else {
-      return;
-    }
-
-    front.direction = -front.direction;
-    if (front.energy == 0) {
-      front.alive = false;
-    } else {
-      front.energy--;
+  // Crests add and then separate again, which is the whole reason the canvas
+  // holds amplitude rather than a level: two fronts crossing make one taller
+  // one. The medium saturates at full output, since there is nothing above it.
+  void draw(const uint16_t canvas[]) const {
+    for (uint16_t i = 0; i < NUM_PIXELS; i++) {
+      const uint16_t displacement = canvas[i] > PEAK ? PEAK : canvas[i];
+      actual_led_strip_set_pixel_hsv(strip, i, hue, (uint8_t)(MEDIUM_VALUE + displacement));
     }
   }
 
-  void draw(const State& state) const {
-    int8_t canvas[NUM_PIXELS];
-    for (int i = 0; i < NUM_PIXELS; i++) {
-      canvas[i] = MEDIUM;
-    }
-
-    // Two pixels wide: one is a dot with no direction to it, and three smears at
-    // a pixel a step. The trailing pixel sits one level down the band, which
-    // gives the front a shape without spending a second colour on it.
-    for (int i = 0; i < MAX_FRONTS; i++) {
-      const Front& front = state.fronts[i];
-      if (!front.alive) {
-        continue;
-      }
-      paint(canvas, front.position, front.energy);
-      paint(canvas, front.position - front.direction, front.energy > 0 ? front.energy - 1 : 0);
-    }
-
-    for (int i = 0; i < NUM_PIXELS; i++) {
-      actual_led_strip_set_pixel_hsv(strip, i, canvas[i] == MEDIUM ? backgroundHue : energyHue(canvas[i]));
-    }
-  }
-
-  // Overlapping fronts add and then separate again. The band is the whole
-  // budget, so the sum tops out at a full front rather than running past it into
-  // a hue that no longer belongs to the ripple.
-  static void paint(int8_t canvas[], int16_t at, int8_t energy) {
-    if (at < 0 || at >= NUM_PIXELS) {
-      return;
-    }
-    if (canvas[at] == MEDIUM) {
-      canvas[at] = energy;
-      return;
-    }
-    int8_t higher = canvas[at] > energy ? canvas[at] : energy;
-    canvas[at] = higher < ENERGY_FULL ? higher + 1 : ENERGY_FULL;
-  }
-
-  uint16_t energyHue(int8_t energy) const {
-    return (uint16_t)(bandSpent + ((int32_t)bandFull - bandSpent) * energy / ENERGY_FULL);
-  }
-
-  uint16_t backgroundHue;
-  uint16_t bandSpent;
-  uint16_t bandFull;
+  uint16_t hue;
   uint32_t seed;
 };
 
