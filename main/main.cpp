@@ -86,31 +86,78 @@ struct Entry {
   const char* name;
 };
 
-Entry animations[] = {
+Entry fullRainbowVariants[] = {
   {&fullRainbowForward, "full rainbow fwd"},
   {&fullRainbowBackward, "full rainbow rev"},
+};
+
+Entry rainbowSliceVariants[] = {
   {&rainbowSliceForward, "rainbow slice fwd"},
   {&rainbowSliceBackward, "rainbow slice rev"},
+};
+
+Entry rainbowDichromaticVariants[] = {
   {&rainbowDichromaticForward, "dichromatic rainbow fwd"},
   {&rainbowDichromaticBackward, "dichromatic rainbow rev"},
+};
+
+Entry dropInVariants[] = {
   {&dropInForward, "drop in"},
+};
+
+Entry dropOffVariants[] = {
   {&dropOffForward, "drop off"},
+};
+
+Entry fillInVariants[] = {
   {&fillInForward, "fill in fwd"},
   {&fillInBackwards, "fill in rev"},
-  // {&blinkComplementDefinedColors, "blink complement, palette"},
-  // {&blinkComplementAllHues, "blink complement, all hues"},
+};
+
+// Out of the rotation, and its four entries are one animation whenever they come
+// back rather than four claims on the strip.
+// Entry blinkComplementVariants[] = {
+//   {&blinkComplementDefinedColors, "blink complement, palette"},
+//   {&blinkComplementAllHues, "blink complement, all hues"},
+//   {&blinkComplementDefinedColorsEvolution, "blink complement, palette, evolving"},
+//   {&blinkComplementAllHuesEvolution, "blink complement, all hues, evolving"},
+// };
+
+Entry bounceVariants[] = {
   {&bounce, "bounce"},
+};
+
+Entry twinkleVariants[] = {
   {&twinkle, "twinkle"},
+};
+
+Entry multiRainbowVariants[] = {
   {&multiRainbowForwards, "multi rainbow fwd"},
   {&multiRainbowBackwards, "multi rainbow rev"},
-  // {&blinkComplementDefinedColorsEvolution, "blink complement, palette, evolving"},
-  // {&blinkComplementAllHuesEvolution, "blink complement, all hues, evolving"},
+};
+
+Entry automatonVariants[] = {
   {&automatonAny, "cellular automaton"},
+};
+
+Entry theaterChaseVariants[] = {
   {&theaterChaseForward, "theater chase fwd"},
   {&theaterChaseBackward, "theater chase rev"},
+};
+
+Entry interferenceVariants[] = {
   {&interference, "interference"},
+};
+
+Entry collisionVariants[] = {
   {&collision, "collision"},
+};
+
+Entry rippleVariants[] = {
   {&ripple, "ripple"},
+};
+
+Entry sortVariants[] = {
   {&sortBitonicRainbow, "sort bitonic, rainbow"},
   {&sortBitonicSegment, "sort bitonic, segment"},
   {&sortQuickRainbow, "sort quick, rainbow"},
@@ -126,6 +173,42 @@ Entry animations[] = {
   {&sortHeapRainbow, "sort heap, rainbow"},
   {&sortHeapSegment, "sort heap, segment"},
 };
+
+// One animation and the entries it is drawn as. The count comes off the array so
+// that adding a variant is one line in one place.
+struct Group {
+  Entry* variants;
+  int count;
+};
+
+template <int N>
+static constexpr Group grouped(Entry (&variants)[N]) {
+  return { variants, N };
+}
+
+// The draw is over animations, and a variant is picked once one has won. Flat, a
+// variant was a ticket: sort holds fourteen of the thirty-four entries and so
+// took 41% of the strip, and bounce, which registers one, took 2.9%. Fifteen
+// animations is 6.7% each.
+Group groups[] = {
+  grouped(fullRainbowVariants),
+  grouped(rainbowSliceVariants),
+  grouped(rainbowDichromaticVariants),
+  grouped(dropInVariants),
+  grouped(dropOffVariants),
+  grouped(fillInVariants),
+  grouped(bounceVariants),
+  grouped(twinkleVariants),
+  grouped(multiRainbowVariants),
+  grouped(automatonVariants),
+  grouped(theaterChaseVariants),
+  grouped(interferenceVariants),
+  grouped(collisionVariants),
+  grouped(rippleVariants),
+  grouped(sortVariants),
+};
+
+static const int GROUP_COUNT = sizeof(groups) / sizeof(groups[0]);
 
 // CONFIG_FREERTOS_HZ is 100, so vTaskDelay resolves to whole 10ms ticks and this
 // is the shortest interval the driver can actually hold. It is also the interval
@@ -194,16 +277,17 @@ void single(void) {
 }
 
 void inOrder(void) {
-  int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
-  for (int i = 0; i < numberOfAnimations; i++) {
-    run(animations[i].animation, animations[i].name);
+  for (int g = 0; g < GROUP_COUNT; g++) {
+    for (int v = 0; v < groups[g].count; v++) {
+      run(groups[g].variants[v].animation, groups[g].variants[v].name);
+    }
   }
 }
 
 void randomlySelect(void) {
-  int numberOfAnimations = (sizeof(animations) / sizeof(animations[0]));
-  int actualAnimationIndex = esp_random_max(numberOfAnimations - 1);
-  run(animations[actualAnimationIndex].animation, animations[actualAnimationIndex].name);
+  const Group& group = groups[esp_random_max(GROUP_COUNT - 1)];
+  const Entry& entry = group.variants[esp_random_max(group.count - 1)];
+  run(entry.animation, entry.name);
 }
 
 extern "C" void app_main(void) {
