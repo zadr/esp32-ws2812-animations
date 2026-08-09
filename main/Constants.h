@@ -7,11 +7,10 @@
 
 #define BRIGHTNESS_SCALE 0.66
 
-// Red reads dimmer than green and blue as overall output falls, so scaling all
-// three together pulls the hue out of every mix that leans on red. Exponent
-// below 1 decays red more slowly. Full output is a fixed point, so the palette
-// is tuned there and this only governs the way down.
-#define RED_RESPONSE 0.54
+// Absolute output level for a pixel, 0 to 255, which an animation may set above
+// or below the default as well as at it. 255ths cannot express BRIGHTNESS_SCALE
+// exactly, so the default lands on the nearest level below it.
+#define VALUE_DEFAULT ((int)(BRIGHTNESS_SCALE * 255))
 
 // Spaced by eye against this strip, not by angle; the trailing figure is where
 // the arithmetic would have put each. Green is the strong die, so yellow lands
