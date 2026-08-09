@@ -21,11 +21,6 @@ struct Shade {
     uint8_t value;
 };
 
-struct ShadePair {
-    Shade base;
-    Shade partner;
-};
-
 // Hue is a full 16-bit wheel, so the narrowing conversion is the wrap: an
 // offset past either end comes back around the other side.
 //
@@ -93,22 +88,47 @@ static uint8_t valueFor(uint16_t hue, uint32_t target) {
     return (uint8_t)low;
 }
 
-// A complement of matching weight. One channel at full against a two channel
-// mix is inherent to opposite hues, so the pair is levelled by dimming the
-// brighter of the two: dimming is always available where brightening runs into
-// the top of the range.
-static ShadePair complementPair(uint16_t hue, uint8_t value = VALUE_DEFAULT) {
-    const uint16_t partner = complementHue(hue);
-    const uint32_t baseOutput = weightedOutput(hue, value);
-    const uint32_t partnerOutput = weightedOutput(partner, value);
+// Bring a set to one output, which the dimmest member at the asked-for value
+// sets, since dimming is always available where brightening runs into the top of
+// the range. Hues go in, values come out.
+//
+// The level is returned because a set is rarely the end of it: a hue arrived at
+// afterwards, a drifted member or two members mixed, sits at the same weight
+// only if it is matched against the same figure.
+static uint32_t level(Shade* shades, int count, uint8_t value) {
+    uint32_t target = 0;
 
-    if (partnerOutput > baseOutput) {
-        ShadePair pair = { { hue, value }, { partner, valueFor(partner, baseOutput) } };
-        return pair;
+    for (int i = 0; i < count; i++) {
+        const uint32_t output = weightedOutput(shades[i].hue, value);
+        if (i == 0 || output < target) {
+            target = output;
+        }
     }
 
-    ShadePair pair = { { hue, valueFor(hue, partnerOutput) }, { partner, value } };
-    return pair;
+    for (int i = 0; i < count; i++) {
+        shades[i].value = valueFor(shades[i].hue, target);
+    }
+
+    return target;
+}
+
+// Hues spaced evenly around the wheel and levelled. Two is the complement and
+// three the triad, which are one rule rather than two: any division lands its
+// members on a different channel mix from each other, so all of them need the
+// same levelling before they read as one set.
+//
+// One is a set too, and answers with the hue it was given, so a caller drawing
+// between one and three colours has no case to write.
+static uint32_t spread(uint16_t hue, int count, Shade* out, uint8_t value = VALUE_DEFAULT) {
+    if (count < 1) {
+        return 0;
+    }
+
+    for (int i = 0; i < count; i++) {
+        out[i].hue = (uint16_t)(hue + (uint32_t)i * (HUE_MAX + 1) / count);
+    }
+
+    return level(out, count, value);
 }
 
 #endif
