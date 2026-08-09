@@ -127,9 +127,12 @@ Entry bounceVariants[] = {
   {&bounce, "bounce"},
 };
 
-Entry twinkleVariants[] = {
-  {&twinkle, "twinkle"},
-};
+// Out of the rotation on the owner's read of the strip. A pixel is the shimmer
+// hue or the background and nothing between, with a step counter for its life,
+// from before set_pixel_hsv carried a value to fade one out on.
+// Entry twinkleVariants[] = {
+//   {&twinkle, "twinkle"},
+// };
 
 Entry multiRainbowVariants[] = {
   {&multiRainbowForwards, "multi rainbow fwd"},
@@ -187,9 +190,9 @@ static constexpr Group grouped(Entry (&variants)[N]) {
 }
 
 // The draw is over animations, and a variant is picked once one has won. Flat, a
-// variant was a ticket: sort holds fourteen of the thirty-four entries and so
-// took 41% of the strip, and bounce, which registers one, took 2.9%. Fifteen
-// animations is 6.7% each.
+// variant was a ticket: sort holds fourteen of the thirty-three entries and so
+// took 42% of the strip, and bounce, which registers one, took 3%. Fourteen
+// animations is 7.1% each.
 Group groups[] = {
   grouped(fullRainbowVariants),
   grouped(rainbowSliceVariants),
@@ -198,7 +201,7 @@ Group groups[] = {
   grouped(dropOffVariants),
   grouped(fillInVariants),
   grouped(bounceVariants),
-  grouped(twinkleVariants),
+  // grouped(twinkleVariants),
   grouped(multiRainbowVariants),
   grouped(automatonVariants),
   grouped(theaterChaseVariants),
