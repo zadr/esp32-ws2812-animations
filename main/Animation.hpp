@@ -37,7 +37,7 @@ public:
     // outlive the call that wrote it.
     virtual void render(uint16_t t) = 0;
 
-    virtual Curve curve() const { return CurveLinear; }
+    virtual Curve curve() const { return CurveQuadraticInOut; }
 
     virtual int tag() = 0;
 
