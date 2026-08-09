@@ -54,7 +54,7 @@ static uint16_t drift(uint16_t hue, uint8_t amount) {
 // of the six sectors along, so the channels at full and at nothing swap and the
 // ramp between them reverses about the same sector position. Exact rather than
 // near, since the ramp is that position rather than a value divided out of it.
-static uint16_t complementHue(uint16_t hue) {
+[[maybe_unused]] static uint16_t complementHue(uint16_t hue) {
     return (uint16_t)(hue + (HUE_MAX + 1) / 2);
 }
 
