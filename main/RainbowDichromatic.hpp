@@ -21,9 +21,11 @@ public:
     // constructed, so there is nothing here to decide and no entropy to draw.
     void setup() override {}
 
-    // A step moves the tape one pixel, so the run is a distance rather than a
-    // count.
-    int duration() override { return SHIFTS * MS_PER_PIXEL; }
+    // Two laps of the palette, which is twice past every seam the tape holds.
+    // The tape crosses a pixel in 20ms through the middle of the run and takes
+    // twice as long over one at the ends, so a lap arrives and leaves slowly and
+    // travels in between.
+    int duration() override { return 16000; }
 
     void render(uint16_t t) override {
         const uint32_t travelled = (uint32_t)stepsAt(t, SHIFTS);
@@ -36,11 +38,6 @@ public:
     int tag() override { return 1007; }
 
 private:
-    // A band crosses the strip in NUM_PIXELS - 1 shifts and there are seven of
-    // them, so the run is a little over two laps of the palette.
-    static const int SHIFTS = 720;
-    static const int MS_PER_PIXEL = 20;
-
     // One short of the strip, so the window always spans a seam and carries two
     // bands at once, which is the whole of the animation.
     static constexpr uint32_t BAND_LENGTH = NUM_PIXELS - 1;
@@ -69,6 +66,10 @@ private:
     };
 
     static constexpr uint32_t BANDS = sizeof(FORWARD) / sizeof(FORWARD[0]);
+
+    // A band crosses the strip in BAND_LENGTH shifts, so this is the two laps
+    // the run is, and the tape ends on the seam it opened at.
+    static constexpr int SHIFTS = 2 * (int)BANDS * (int)BAND_LENGTH;
 
     // Which band a position falls in and how far into it are the same division.
     // A band opens holding its first hue and the ramp fills what is left, so the

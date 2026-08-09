@@ -11,7 +11,10 @@ public:
 
     void setup() override {}
 
-    int duration() override { return FLASHES * MS_PER_FLASH; }
+    // A burst rather than a run. The strip is at full white and there is nothing
+    // in it to develop, so three seconds is already the whole of what it has;
+    // held longer it stops being a punctuation mark.
+    int duration() override { return RUN_MS; }
 
     // Which half of which flash the strip is in follows from t alone, so there is
     // no counter and no state between renders.
@@ -35,10 +38,14 @@ public:
     int tag() override { return 1006; }
 
 private:
+    static const int RUN_MS = 3000;
+
     // Dark and lit hold half a flash each. At this rate the strip reads as a
-    // strobe rather than as something switching on and off.
-    static const int FLASHES = 50;
+    // strobe rather than as something switching on and off, which is a
+    // perceptual figure and not a frame interval. Taken against the cruise,
+    // which the trapezoid holds a seventh above the mean rate.
     static const int MS_PER_FLASH = 50;
+    static const int FLASHES = RUN_MS * 6 / (MS_PER_FLASH * 7);
 };
 
 #endif

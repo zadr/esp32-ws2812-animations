@@ -17,12 +17,15 @@ public:
     seed = esp_random();
   }
 
-  // One trip up the strip and back, at the speed the head crosses a pixel.
-  // Neither end is counted twice, so the run closes on the pixel it opened at.
-  int duration() override { return ROUND_TRIP * MS_PER_PIXEL; }
+  // Three trips up the strip and back, which puts the head at 44ms to the pixel
+  // through the middle of the run: travelling rather than sliding, and slow
+  // enough at the turns that the far end is a stop rather than a blur. Neither
+  // end is counted twice, so the run closes on the pixel it opened at, and five
+  // bounces are enough for the hue to have gone somewhere by then.
+  int duration() override { return 15000; }
 
   void render(uint16_t t) override {
-    const int step = stepsAt(t, ROUND_TRIP);
+    const int step = stepsAt(t, STEPS);
 
     // A leg is one length of the strip, so the count of legs behind the head is
     // also the count of bounces behind it, and the parity of that count is which
@@ -38,8 +41,8 @@ public:
 
 private:
   static constexpr int LEG = NUM_PIXELS - 1;
-  static constexpr int ROUND_TRIP = 2 * LEG;
-  static constexpr int MS_PER_PIXEL = 10;
+  static constexpr int TRIPS = 3;
+  static constexpr int STEPS = 2 * LEG * TRIPS;
 
   static constexpr uint8_t DRIFT_MAX = 30;
 

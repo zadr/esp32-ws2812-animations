@@ -36,7 +36,7 @@ public:
     seedCell = esp_random_max(NUM_PIXELS - 1);
   }
 
-  int duration() override { return GENERATIONS * MS_PER_GENERATION; }
+  int duration() override { return RUN_MS; }
 
   void render(uint16_t t) override {
     Ring ring = opening();
@@ -55,14 +55,20 @@ public:
 private:
   static_assert(NUM_PIXELS < 64, "the ring is carried in one word");
 
-  // Five laps at the one cell per generation speed limit. Rule 30 closes the
-  // ring on itself in half a lap and boils for the rest; rule 110 needs a full
-  // lap before its left edge catches its own right one.
-  static constexpr int GENERATIONS = NUM_PIXELS * 5;
+  // A rule needs room to get past what it does first. Rule 30 closes the ring on
+  // itself in half a lap and boils for the rest; rule 110 needs a full lap
+  // before its left edge catches its own right one, and a pattern that has only
+  // just closed has not been watched doing anything with it. Five laps at the
+  // one cell per generation speed limit is what that comes to, and the run is
+  // sized to hold them.
+  static constexpr int RUN_MS = 24000;
 
   // A generation is a discrete event, so this is its dwell rather than a frame
-  // interval.
+  // interval. Taken against the cruise, which the trapezoid holds a seventh
+  // above the mean rate.
   static constexpr int MS_PER_GENERATION = 80;
+  static constexpr int GENERATIONS = RUN_MS * 6 / (MS_PER_GENERATION * 7);
+  static_assert(GENERATIONS >= NUM_PIXELS * 5, "the run is short of five laps of the ring");
 
   static constexpr uint64_t RING = (1ULL << NUM_PIXELS) - 1;
   static constexpr int HISTORY = 32;

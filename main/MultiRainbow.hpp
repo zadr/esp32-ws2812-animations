@@ -30,16 +30,17 @@ public:
         }
     }
 
-    // Every hue turns by the same amount each step, so the pattern holds its
-    // shape and travels through the wheel. HUE_MAX / HUE_PER_STEP steps is one
-    // turn of it, and the run is just under three.
-    int duration() override { return STEPS * MS_PER_STEP; }
+    // Three turns of the wheel at six seconds a turn, as the single rainbow
+    // runs: the hue moves at the same rate whatever the count, and what the
+    // count changes is how far along the strip a turn carries the pattern.
+    int duration() override { return 18000; }
 
-    // The offset follows from t alone, so there is nothing to carry between
-    // renders and two renders at the same t draw the same strip.
+    // Every hue turns by the same amount, so the pattern holds its shape and
+    // travels through the wheel. The offset follows from t alone: it runs to
+    // 65535 and a turn is HUE_MAX, so TURNS turns across the run is t times
+    // TURNS with nothing left to divide out, and there is no step to land on.
     void render(uint16_t t) override {
-        const uint32_t travelled = ((uint32_t)t * STEPS) / 65535;
-        const uint16_t turned = (uint16_t)((travelled * HUE_PER_STEP) % HUE_MAX);
+        const uint16_t turned = (uint16_t)(((uint32_t)t * TURNS) % HUE_MAX);
 
         for (int i = 0; i < NUM_PIXELS; i++) {
             actual_led_strip_set_pixel_hsv(strip, i, turn(hues[i], turned));
@@ -49,9 +50,7 @@ public:
     int tag() override { return 1011; }
 
 private:
-    static const int STEPS = 1950;
-    static const int HUE_PER_STEP = 100;
-    static const int MS_PER_STEP = 10;
+    static const int TURNS = 3;
 
     // The wheel closes at HUE_MAX, one short of the uint16 it is carried in, so
     // this is not a uint16 wrap: 65535 is never reached, and a hue crossing the

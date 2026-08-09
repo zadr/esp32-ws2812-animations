@@ -21,7 +21,7 @@ public:
     seed = esp_random();
   }
 
-  int duration() override { return BLINKS * MS_PER_BLINK; }
+  int duration() override { return RUN_MS; }
 
   // The swap alone would be the parity of the blink count, but where a drift has
   // got to is reachable only through the drifts before it, so both variants walk.
@@ -39,11 +39,16 @@ public:
   int tag() override { return 1000; }
 
 private:
-  static const int BLINKS = 24;
+  // Two hues trading places is one idea, and the evolving variants are that idea
+  // going somewhere. Twelve seconds is thirty swaps, which is enough of a walk
+  // to have left the complement it started as behind.
+  static const int RUN_MS = 12000;
 
   // A dwell rather than a frame interval: long enough that each pair of hues is
-  // read before it swaps.
+  // read before it swaps. Taken against the cruise, which the trapezoid holds a
+  // seventh above the mean rate.
   static const int MS_PER_BLINK = 333;
+  static const int BLINKS = RUN_MS * 6 / (MS_PER_BLINK * 7);
 
   static constexpr uint16_t PALETTE[] = {HUE_RED, HUE_ORANGE, HUE_YELLOW, HUE_GREEN, HUE_BLUE, HUE_INDIGO, HUE_VIOLET};
   static constexpr int PALETTE_SIZE = sizeof(PALETTE) / sizeof(PALETTE[0]);

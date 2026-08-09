@@ -17,11 +17,11 @@ public:
     seed = esp_random();
   }
 
-  int duration() override { return STEPS * MS_PER_STEP; }
+  int duration() override { return RUN_MS; }
 
   // A twinkle outlives the step that lit it, so there is no place to jump to and
   // the run is walked from its opening on every render. Whole strip, whole walk,
-  // in locals: 216 steps of fifty pixels is well inside the tick.
+  // in locals: 171 steps of fifty pixels is well inside the tick.
   void render(uint16_t t) override {
     State state = opening();
 
@@ -36,12 +36,17 @@ public:
   int tag() override { return 1010; }
 
 private:
-  static constexpr int STEPS = 216;
+  // Nothing accumulates here and nothing arrives: the strip at the end of a run
+  // is the strip at the start of one with different pixels lit. So the length is
+  // how long a state the room is in wants to last, not how long anything takes.
+  static constexpr int RUN_MS = 20000;
 
   // A twinkle's life is counted in steps, so this is the dwell of one twinkle
   // tick rather than a frame interval: the lifetimes below are 300 to 1500ms of
-  // it, which is what was tuned.
+  // it, which is what was tuned. Taken against the cruise, which the trapezoid
+  // holds a seventh above the mean rate.
   static constexpr int MS_PER_STEP = 100;
+  static constexpr int STEPS = RUN_MS * 6 / (MS_PER_STEP * 7);
 
   // Density rather than a fixed count: 36 of the original 432 pixels. A fixed
   // 36 on a short strip lights most of it at once and reads as noise.

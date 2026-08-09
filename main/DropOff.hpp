@@ -16,7 +16,10 @@ public:
 
   void setup() override { seed = esp_random(); }
 
-  int duration() override { return positions() * MS_PER_POSITION; }
+  // Seven blocks, each falling the length of the strip in about a second and a
+  // half. Longer than that and the block reads as being lowered rather than
+  // dropped, and nothing is left behind it to look at while it goes.
+  int duration() override { return 12000; }
 
   // One block falls per hue and nothing is left behind it, so the strip at step
   // n is the block alone: which band it belongs to and how far down it has come
@@ -42,10 +45,6 @@ private:
     // DropIn's run for minutes, which is why that one draws a related few
     // instead.
     static const int BANDS = ANCHOR_COUNT;
-
-    // What the block holds at each place it lands, so the descent keeps its
-    // pace on a strip long enough to widen the chunk.
-    static const int MS_PER_POSITION = 50;
 
     // Chunk scales with strip length but never reaches zero, which on a short
     // strip would make the descent stop advancing.

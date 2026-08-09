@@ -16,7 +16,10 @@ public:
 
   void setup() override { seed = esp_random(); }
 
-  int duration() override { return NUM_PIXELS * BANDS * MS_PER_PIXEL; }
+  // Seven bands, each taking a little under two seconds to cross the strip. A
+  // fill is worth watching arrive, and faster than this the band is already laid
+  // by the time the eye has followed it there.
+  int duration() override { return 15000; }
 
   // Step n lays the nth pixel of band n / NUM_PIXELS over what the band before
   // left there, so the strip is two runs: the part this band has reached, and
@@ -46,7 +49,6 @@ public:
 
 private:
   static const int BANDS = 7;
-  static const int MS_PER_PIXEL = 10;
 
   static constexpr uint16_t ANCHORS[BANDS] = {
     HUE_RED, HUE_ORANGE, HUE_YELLOW, HUE_GREEN, HUE_BLUE, HUE_INDIGO, HUE_VIOLET,

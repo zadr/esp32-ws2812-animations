@@ -16,13 +16,14 @@
 static const uint16_t INTERFERENCE_PIXEL_STEP_LONG = 3277;
 static const uint16_t INTERFERENCE_PIXEL_STEP_SHORT = 5303;
 
-// Deliberately not in the ratio of the wavelengths. Matching ratios give both
-// waves the same phase velocity and the whole figure, envelope included, slides
-// along rigidly. These have the carriers running down the strip at a mean 8 and
-// 3.3 pixels per second while the envelope crawls up it at 4.4, all three scaled
-// by whatever rate the curve is holding at that point in the run.
-static const uint16_t INTERFERENCE_FRAME_STEP_LONG = 1049;
-static const uint16_t INTERFERENCE_FRAME_STEP_SHORT = 691;
+// Phase per step of time, as the pair above is phase per pixel. Deliberately not
+// in the ratio of the wavelengths: matching ratios give both waves the same
+// phase velocity and the whole figure, envelope included, slides along rigidly.
+// These have the carriers running down the strip at 8 and 3.3 pixels per second
+// while the envelope crawls up it at 4.4, all three as the middle of a run holds
+// them and slower at either end of it.
+static const uint16_t INTERFERENCE_TIME_STEP_LONG = 1049;
+static const uint16_t INTERFERENCE_TIME_STEP_SHORT = 691;
 
 // Amplitude is value, and hue holds still for the whole run. Amplitude spent on
 // hue instead reads as a colour gradient travelling along the strip, which is a
@@ -47,7 +48,7 @@ public:
     setupPhaseShort = esp_random_max(HUE_MAX);
   }
 
-  int duration() override { return STEPS * MS_PER_STEP; }
+  int duration() override { return RUN_MS; }
 
   // Both phases are the opening phase plus a fixed step times the step count, so
   // there is nothing to integrate and no accumulator to hold. The uint16_t cast
@@ -55,18 +56,24 @@ public:
   void render(uint16_t t) override {
     const int step = stepsAt(t, STEPS);
 
-    draw((uint16_t)(setupPhaseLong + INTERFERENCE_FRAME_STEP_LONG * step),
-         (uint16_t)(setupPhaseShort + INTERFERENCE_FRAME_STEP_SHORT * step));
+    draw((uint16_t)(setupPhaseLong + INTERFERENCE_TIME_STEP_LONG * step),
+         (uint16_t)(setupPhaseShort + INTERFERENCE_TIME_STEP_SHORT * step));
   }
 
   int tag() override { return 1016; }
 
 private:
-  // The envelope takes about 280 steps to cross the strip, so this is a little
-  // under two passes of it. The two frame steps are phase per step at this
-  // dwell, so the dwell is part of what sets the velocities above.
-  static const int STEPS = 500;
+  // The envelope crosses the strip in about eleven seconds and is the slowest
+  // thing in the figure, so it is what the length is set by: a run is a little
+  // short of two crossings of it.
+  static const int RUN_MS = 24000;
+
+  // The two time steps above are phase per step at this dwell, so it is a rate
+  // the figure is drawn against rather than a frame interval: change it and the
+  // velocities quoted there are no longer the ones on the strip. Taken against
+  // the cruise, which the trapezoid holds a seventh above the mean rate.
   static const int MS_PER_STEP = 40;
+  static const int STEPS = RUN_MS * 6 / (MS_PER_STEP * 7);
 
   // Two waves are summed where they are amplitudes and nowhere else. Two hue
   // angles cannot be added at all: both wrap, their sum wraps twice as often,

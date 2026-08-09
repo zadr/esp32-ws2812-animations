@@ -29,7 +29,7 @@ public:
     seed = esp_random();
   }
 
-  int duration() override { return STEPS * MS_PER_PIXEL; }
+  int duration() override { return RUN_MS; }
 
   // Speed belongs to the medium, so the run cannot be eased: a curve that holds
   // at the ends and runs at twice the rate through the middle is a change in how
@@ -92,16 +92,25 @@ private:
   static_assert(PEAK - MAX_LIFETIME * SPREAD_LOSS - 2 * REFLECTION_LOSS < MIN_AMPLITUDE,
                 "a front outlives the tail the run leaves for it");
 
-  static constexpr uint32_t IMPULSES = 9;
-  static constexpr int IMPULSE_PERIOD = 70;
-
-  // The last impulse gets its whole life inside the run, so the water is still
-  // at both ends of it.
-  static constexpr int STEPS = ((int)IMPULSES - 1) * IMPULSE_PERIOD + MAX_LIFETIME;
+  // Fifteen seconds of water. A front lives about three of them, so this is
+  // long enough that a stretch of the run is fronts crossing fronts rather than
+  // one impulse at a time, and short enough that it is still one disturbance
+  // settling rather than weather.
+  static constexpr int RUN_MS = 15000;
 
   // A front covers a pixel a step, so the step is the speed of the medium rather
-  // than a frame interval: a length of strip in a second.
+  // than a frame interval: a length of strip in a second. The run is not eased,
+  // so the steps it holds are the plain division.
   static constexpr int MS_PER_PIXEL = 20;
+  static constexpr int STEPS = RUN_MS / MS_PER_PIXEL;
+
+  // How many disturbances a run is, spread across it rather than dropped at a
+  // fixed interval and however many that leaves room for. The last one is given
+  // its whole life inside the run, so the water is still at both ends of it.
+  static constexpr uint32_t IMPULSES = 9;
+  static constexpr int IMPULSE_PERIOD = (STEPS - MAX_LIFETIME) / ((int)IMPULSES - 1);
+  static_assert(((int)IMPULSES - 1) * IMPULSE_PERIOD + MAX_LIFETIME <= STEPS,
+                "the last front is still running when the run ends");
 
   // The reflected path is the triangle the unfolded one traces, and the count of
   // reflections is the count of ends reached, which is the first and then one

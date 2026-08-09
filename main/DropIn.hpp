@@ -19,7 +19,7 @@ public:
 
   // As long as the colours drawn for it, since a band is a fill of the whole
   // strip and setup() decides how many there are.
-  int duration() override { return positions() * MS_PER_POSITION; }
+  int duration() override { return bands * MS_PER_BAND; }
 
   // Sweeps shorten by one position as the pile grows, so a band is a triangular
   // number of positions and the sweep a position falls in is found by peeling
@@ -47,9 +47,12 @@ private:
     // together carry the fill as well as seven unrelated ones do.
     static const int MAX_BANDS = 3;
 
-    // What the block holds at each place it passes, so the sweep keeps its pace
-    // on a strip long enough to widen the chunk.
-    static const int MS_PER_POSITION = 25;
+    // A band is fifty sweeps and each is a place shorter than the one before, so
+    // it is over a thousand places the block passes through and it wants to be
+    // falling through them. This is the shortest a band can run and still leave
+    // a frame at every one: the block crosses a pixel a frame through the middle
+    // of a band and takes two over one at the ends.
+    static const int MS_PER_BAND = 16000;
 
     // One relationship for the whole run, so the colours that arrive have a
     // reason to be seen together and the run is as long as what it drew. Either

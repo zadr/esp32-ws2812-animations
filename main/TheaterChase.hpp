@@ -20,10 +20,11 @@ public:
     alternateHue = COMPLEMENT(litHue);
   }
 
-  // Six passes along the strip at the speed a dot reads as running rather than
-  // sliding. Speed is stated as the time a dot takes to cross a pixel, which is
-  // what was tuned; the frames that fall inside it are the driver's affair.
-  int duration() override { return NUM_PIXELS * PASSES * MS_PER_PIXEL; }
+  // Six passes along the strip. A dot crosses a pixel in 60ms through the middle
+  // of the run, which is what it was tuned at and the speed it reads as running
+  // rather than sliding; the extra seventh over what a flat 60ms asks for is
+  // what the ramps at either end take back.
+  int duration() override { return 21000; }
 
   // Where the dots sit follows from t alone, so there is no counter and no state
   // between renders. Two renders at the same t draw the same strip.
@@ -55,7 +56,6 @@ public:
 
 private:
   static const int PASSES = 6;
-  static const int MS_PER_PIXEL = 60;
 
   // Two hues, so the pattern only comes back around after twice the spacing.
   // Wrapping the phase at the spacing alone would flip every dot at the seam.
