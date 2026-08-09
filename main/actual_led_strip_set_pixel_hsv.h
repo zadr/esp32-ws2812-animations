@@ -43,10 +43,43 @@ static void hue_to_rgb16(uint16_t h, uint32_t &r, uint32_t &g, uint32_t &b) {
 //
 // Eight fractional bits rather than a whole duty step, so the compensation still
 // resolves between adjacent values where an animation sweeps one. Full output is
-// 255 << 8, which is also the scale color_utils weighs the three dies on.
-static uint32_t red_level(uint8_t value) {
+// 255 << 8, which is also the scale color_utils weighs the three dies on, and at
+// 65280 it is the reason a uint16_t holds the answer.
+//
+// The part has no FPU and a frame asks this of every pixel, so the 256 answers
+// the expression can give are taken once and read back afterwards. The table is
+// filled by that expression rather than by anything derived from it, because
+// what the palette was judged against is this chip's soft-float powf and not the
+// real root.
+static uint16_t RED_LEVEL[256];
+
+static uint32_t red_level_powf(uint8_t value) {
     return (uint32_t)(255.0f * 256.0f * powf(value / 255.0f, RED_RESPONSE) + 0.5f);
 }
+
+static uint32_t red_level(uint8_t value) {
+    return RED_LEVEL[value];
+}
+
+// An animation's constructor can reach a hue before app_main does, so the fill
+// is a dynamic initialiser here rather than a call from there; this header is
+// included ahead of anything that could ask.
+static bool red_level_fill() {
+    unsigned matched = 0;
+
+    for (unsigned i = 0; i < 256; i++) {
+        const uint32_t exact = red_level_powf((uint8_t)i);
+        RED_LEVEL[i] = (uint16_t)exact;
+        if (red_level((uint8_t)i) == exact) {
+            matched++;
+        }
+    }
+
+    ESP_EARLY_LOGI("red_level", "%u/256 match powf", matched);
+    return true;
+}
+
+[[maybe_unused]] static const bool RED_LEVEL_READY = red_level_fill();
 
 // Several animations step in fixed blocks that overrun a strip length not
 // divisible by the block size, so the bound is enforced here rather than in
