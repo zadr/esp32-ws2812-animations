@@ -132,16 +132,16 @@ private:
   // itself in half a lap and boils for the rest; rule 110 needs a full lap
   // before its left edge catches its own right one, and a pattern that has only
   // just closed has not been watched doing anything with it. Five laps at the
-  // one cell per generation speed limit is what that comes to, and the run is
-  // sized to hold them.
-  static constexpr int RUN_MS = 48000;
+  // one cell per generation speed limit is what that comes to, which the assert
+  // below holds the run to; the length itself is set by how long a rule is worth
+  // watching, well past that floor.
+  static constexpr int RUN_MS = 300000;
 
   // A generation is a discrete event, so this is its dwell rather than a frame
-  // interval. The count is a seventh under what the run holds at that dwell, so
-  // the ring stands on each generation a little longer than the figure the pool
-  // was watched at.
-  static constexpr int MS_PER_GENERATION = 80;
-  static constexpr int GENERATIONS = RUN_MS * 6 / (MS_PER_GENERATION * 7);
+  // interval, and it is the whole of how fast the ring moves. The count falls
+  // out of the run, so this is the only figure to move.
+  static constexpr int MS_PER_GENERATION = 190;
+  static constexpr int GENERATIONS = RUN_MS / MS_PER_GENERATION;
   static_assert(GENERATIONS >= NUM_PIXELS * 5, "the run is short of five laps of the ring");
 
   static constexpr Cells RING = Cells::mask(NUM_PIXELS);
