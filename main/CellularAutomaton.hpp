@@ -7,6 +7,7 @@
 #include "actual_led_strip_set_pixel_hsv.h"
 #include "esp_random.h"
 #include "esp_random_max.h"
+#include "HueDrift.hpp"
 
 // One bit per pixel. The target has no integer this wide, so the ring is two
 // words with the high one masked back to the pixels that exist; a rotation is
@@ -71,7 +72,8 @@ class CellularAutomaton : public Animation {
 public:
   // Rule 0 leaves nothing alive, so it can stand for no pin at all.
   CellularAutomaton(Frame& strip, uint8_t pinned = 0)
-    : Animation(strip), pinned(pinned), rule(0), seed(0), seedCell(0), seedHue(0), walkedTo(UNWALKED) {}
+    : Animation(strip), pinned(pinned), rule(0), seed(0), seedCell(0), liveHue{}, settledHue{},
+      walkedTo(UNWALKED) {}
 
   void setup() override {
     // A new rule and a new opening, so what was walked belongs to the last run.
@@ -81,7 +83,12 @@ public:
     ESP_LOGI("animation", "Cellular automaton rule %d", rule);
 
     seed = esp_random();
-    seedHue = esp_random_max(HUE_VIOLET);
+
+    // Drawn apart, so the pair has no fixed interval and no shared direction.
+    // They cross, close up and pull away over a run, and which of the two tones
+    // is which colour is not settled for the whole of it.
+    liveHue = pickHueDrift(RUN_MS);
+    settledHue = pickHueDrift(RUN_MS);
 
     // The single live cell is the seed these rules are known by, and the one the
     // pool was measured from. A ring has no centre, so the index only decides
@@ -90,6 +97,11 @@ public:
   }
 
   int duration() override { return RUN_MS; }
+
+  // A hue drifting at a rate cannot be handed a shaped t and still arrive where
+  // it was drawn to, and a generation has nothing to ease into. Both run at the
+  // rate they were sized at, from the first frame to the last.
+  Curve curve() const override { return CurveLinear; }
 
   void render(uint16_t t) override {
     const int generations = stepsAt(t, GENERATIONS);
@@ -107,8 +119,8 @@ public:
       walkedTo++;
     }
 
-    // The sweep has no state to walk, so it comes straight off t.
-    draw(walked, (uint16_t)((seedHue + (uint32_t)t * HUE_SPAN / 65536) % HUE_SPAN));
+    // Neither hue has state to walk, so both come straight off t.
+    draw(walked, liveHue.at(t), settledHue.at(t));
   }
 
   int tag() override { return 1013; }
@@ -125,8 +137,9 @@ private:
   static constexpr int RUN_MS = 48000;
 
   // A generation is a discrete event, so this is its dwell rather than a frame
-  // interval. Taken against the cruise, which the trapezoid holds a seventh
-  // above the mean rate.
+  // interval. The count is a seventh under what the run holds at that dwell, so
+  // the ring stands on each generation a little longer than the figure the pool
+  // was watched at.
   static constexpr int MS_PER_GENERATION = 80;
   static constexpr int GENERATIONS = RUN_MS * 6 / (MS_PER_GENERATION * 7);
   static_assert(GENERATIONS >= NUM_PIXELS * 5, "the run is short of five laps of the ring");
@@ -187,16 +200,19 @@ private:
     }
   }
 
-  // Cells that also lived last generation take a neighbouring hue. Age counted
-  // any further would be a per pixel gradient, which at this width is a mush of
+  // Cells that also lived last generation take the other hue. Age counted any
+  // further would be a per pixel gradient, which at this width is a mush of
   // single lit pixels in different colours; two tones stay coarse enough to read
   // as the boundary between the settled side of a pattern and the churning side.
-  void draw(const Ring& ring, uint16_t base) const {
-    const uint16_t settled = (base + HUE_SPAN / 8) % HUE_SPAN;
+  //
+  // The two are whatever the drifts say they are, including near enough to each
+  // other to be one colour for a stretch. What separates the tones is which
+  // cells they land on, and that boundary is the pattern's, not the palette's.
+  void draw(const Ring& ring, uint16_t live, uint16_t settled) const {
     const Cells held = ring.cells & ring.previous;
     for (uint16_t i = 0; i < NUM_PIXELS; i++) {
       if (ring.cells.bit(i)) {
-        actual_led_strip_set_pixel_hsv(strip, i, held.bit(i) ? settled : base);
+        actual_led_strip_set_pixel_hsv(strip, i, held.bit(i) ? settled : live);
       }
     }
   }
@@ -277,7 +293,8 @@ private:
   uint8_t rule;
   uint32_t seed;
   uint16_t seedCell;
-  uint16_t seedHue;
+  HueDrift liveHue;
+  HueDrift settledHue;
 
   // How far the run has been walked, and where it got to. Read only through
   // render(), which either extends the walk or throws it away and starts again,
