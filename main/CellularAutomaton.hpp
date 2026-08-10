@@ -65,9 +65,8 @@ struct Cells {
 // The strip is a ring, so a pattern running off one end arrives at the other
 // rather than dying against a dead edge, which 50 cells cannot spare.
 //
-// Constructed without a rule it draws one per run from the table below and logs
-// it, so a rule worth keeping can be found by watching and then pinned by
-// number.
+// Constructed without a rule it draws one of the 256 per run and logs it, so a
+// rule worth keeping can be found by watching and then pinned by number.
 class CellularAutomaton : public Animation {
 public:
   // Rule 0 leaves nothing alive, so it can stand for no pin at all.
@@ -90,9 +89,8 @@ public:
     liveHue = pickHueDrift(RUN_MS);
     settledHue = pickHueDrift(RUN_MS);
 
-    // The single live cell is the seed these rules are known by, and the one the
-    // pool was measured from. A ring has no centre, so the index only decides
-    // where the strip cuts the pattern.
+    // The single live cell is the seed these rules are known by. A ring has no
+    // centre, so the index only decides where the strip cuts the pattern.
     seedCell = esp_random_max(NUM_PIXELS - 1);
   }
 
@@ -158,27 +156,23 @@ private:
     int historyNext;
   };
 
-  // Measured on this ring from this seed rather than taken on reputation. Every
-  // rule left out either dies, freezes, or trips the cycle detector often enough
-  // that the run becomes a slideshow of reseeds. Two families go early: a rule
-  // that maps 000 to 1 floods all fifty pixels at full brightness on the second
-  // generation, and with no per pixel value to soften it that is a flash rather
-  // than a pattern; a rule that maps 000, 001, 010 and 100 all to 0 has nothing
-  // left after the seed. Eight of the survivors share rule 90's evolution
-  // exactly from a single cell, so rule 90 stands for all of them.
-  static constexpr uint8_t POOL[] = {22, 30, 54, 60, 86, 90, 102, 106, 110, 120, 122, 124, 126, 150, 182};
+  // The rules that carry a name outside their number. 30 is the chaos Wolfram
+  // built Mathematica's random numbers on; 60, 90, 102 and 150 are the additive
+  // ones that draw Sierpinski's triangle; 110 is the one Cook proved universal;
+  // 184 is the traffic model; 54 is the class four candidate; 18, 22, 45, 73,
+  // 105, 122, 126 and 182 are the class three rules the classification is
+  // usually shown with.
+  static constexpr uint8_t FAMOUS[] = {18, 22, 30, 45, 54, 60, 73, 90, 102, 105, 110, 122, 126, 150, 182, 184};
 
-  // Drawn from half the time, so roughly three times as likely each. The mirrors
-  // 86, 102 and 124 stay in the pool alone: a mirrored rule is the same
-  // behaviour running the other way along the strip, worth seeing but not worth
-  // favouring twice.
-  static constexpr uint8_t FEATURED[] = {22, 30, 54, 60, 90, 110, 126, 150, 182};
-
+  // Half the draws are uniform over all 256 and half land on the table, which
+  // is seventeen to one on a named rule against an unnamed one and leaves every
+  // rule reachable, including the ones that die on the first generation and the
+  // ones that only shift.
   static uint8_t pick() {
     if (esp_random_max(1)) {
-      return FEATURED[esp_random_max(sizeof(FEATURED) / sizeof(FEATURED[0]) - 1)];
+      return FAMOUS[esp_random_max(sizeof(FAMOUS) / sizeof(FAMOUS[0]) - 1)];
     }
-    return POOL[esp_random_max(sizeof(POOL) / sizeof(POOL[0]) - 1)];
+    return (uint8_t)esp_random_max(255);
   }
 
   Ring opening() const {
@@ -237,9 +231,9 @@ private:
   // A rotation of a past generation is as spent as an exact repeat: the rule
   // reads the same at every cell, so the ring would replay that stretch shifted
   // along the strip forever. Rule 110 settles into a drifting background this
-  // way, which an exact comparison would never catch. A rule that is itself a
-  // shift trips this on its first generation, which is why those are kept out of
-  // the pool rather than the detector being loosened to admit them.
+  // way, which an exact comparison would never catch. A rule that is only a
+  // shift is a rotation of the generation before it, so it trips this at once
+  // and keeps tripping, and what the strip shows for those is the reseed.
   //
   // Two states are rotations of one another exactly when their smallest
   // rotations are equal, so the history holds smallest rotations and the check
