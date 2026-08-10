@@ -51,6 +51,10 @@ struct Cells {
     return Cells(word[0] | other.word[0], word[1] | other.word[1]);
   }
 
+  constexpr Cells operator^(const Cells& other) const {
+    return Cells(word[0] ^ other.word[0], word[1] ^ other.word[1]);
+  }
+
   constexpr bool operator==(const Cells& other) const {
     return word[0] == other.word[0] && word[1] == other.word[1];
   }
@@ -146,14 +150,65 @@ private:
   static constexpr int HISTORY = 32;
   static constexpr Cells VACANT = Cells(~0ULL, ~0ULL); // sits outside RING, so it matches nothing
 
+  // Generations the value ramp counts a cell across, the current one included.
+  //
+  // Even, so a cell lit on alternate generations is lit in exactly half of it
+  // whichever generation the window ends on, and holds a level instead of
+  // swinging a step either side of one.
+  //
+  // Eight of them is a second and a half at MS_PER_GENERATION, which is about as
+  // far back as the eye still has the strip; further and a cell's brightness is
+  // reporting a pattern that has already left it. Eight also puts three steps
+  // between arrival and alternation and four more between alternation and
+  // standing still, so those three readings are apart rather than adjacent.
+  static constexpr int WINDOW = 8;
+  static_assert(WINDOW % 2 == 0, "an alternating cell would swing between two levels");
+
+  // Bit planes a depth is carried in. Depth reaches WINDOW, not WINDOW - 1.
+  static constexpr int PLANES = 4;
+  static_assert(WINDOW <= (1 << PLANES) - 1, "a full window overflows the planes");
+
+  // A lit cell counts itself, so depth runs 1 to WINDOW: just arrived at the
+  // bottom, lit throughout at the top, alternating at half.
+  //
+  // The bottom of the duty range is where a step in value stops being a step in
+  // brightness. It is visibly stepped below 32 and reads as separate stops below
+  // 8, so the dim end stands well above that instead of near the floor. The two
+  // ends then sit the same distance either side of VALUE_DEFAULT, which places
+  // the ramp against the level the rest of the strip runs at rather than against
+  // the top of what the driver will take; 84 is the widest that reaches without
+  // the top end running past 255.
+  static constexpr int VALUE_ARRIVED = 84;
+  static constexpr int VALUE_HELD = 252;
+  static constexpr int VALUE_STEP = (VALUE_HELD - VALUE_ARRIVED) / (WINDOW - 1);
+  static_assert(VALUE_ARRIVED + VALUE_HELD == 2 * VALUE_DEFAULT, "the ramp is off centre");
+  static_assert((VALUE_HELD - VALUE_ARRIVED) % (WINDOW - 1) == 0, "the ramp has an uneven step");
+
   // Everything that moves during a run. Whole, so that a Ring plus the number
   // of generations standing in it is the entire walk and nothing else has to be
   // carried alongside it to resume.
   struct Ring {
     Cells cells;
     Cells previous;
+    Cells recent[WINDOW];
+    int recentNext;
     Cells history[HISTORY];
     int historyNext;
+  };
+
+  // How many of the window each cell was lit in, a bit plane at a time: plane p
+  // holds bit p of every cell's count, so a hundred counts are summed in word
+  // operations and a draw reads one bit per plane.
+  struct Depth {
+    Cells plane[PLANES];
+
+    int at(int i) const {
+      int lit = 0;
+      for (int p = 0; p < PLANES; p++) {
+        lit |= (int)plane[p].bit(i) << p;
+      }
+      return lit;
+    }
   };
 
   // The rules that carry a name outside their number. 30 is the chaos Wolfram
@@ -180,6 +235,7 @@ private:
     ring.cells = Cells();
     ring.cells.set(seedCell);
     ring.previous = Cells();
+    blank(ring);
     forget(ring);
     return ring;
   }
@@ -191,24 +247,55 @@ private:
       reseed(ring, generation);
     } else {
       remember(ring, ring.cells);
+      record(ring, ring.cells);
     }
   }
 
-  // Cells that also lived last generation take the other hue. Age counted any
-  // further would be a per pixel gradient, which at this width is a mush of
-  // single lit pixels in different colours; two tones stay coarse enough to read
-  // as the boundary between the settled side of a pattern and the churning side.
+  // Cells that also lived last generation take the other hue. Age carried any
+  // further in hue would be a per pixel gradient, which at this width is a mush
+  // of single lit pixels in different colours; two tones stay coarse enough to
+  // read as the boundary between the settled side of a pattern and the churning
+  // side. The two are whatever the drifts say they are, including near enough to
+  // each other to be one colour for a stretch, and what separates them is which
+  // cells they land on rather than anything in the palette.
   //
-  // The two are whatever the drifts say they are, including near enough to each
-  // other to be one colour for a stretch. What separates the tones is which
-  // cells they land on, and that boundary is the pattern's, not the palette's.
+  // Hue asks one generation back and no further, so a rule whose lit set
+  // alternates between the even and the odd cells, rule 90 among them, never
+  // lights a cell twice running and never reaches the settled hue at all. Value
+  // asks the length of the window, where those cells spread across the lower
+  // half of the ramp instead of standing together at one level, and where a cell
+  // that keeps returning sits above one that has just arrived and below one that
+  // has not gone out.
   void draw(const Ring& ring, uint16_t live, uint16_t settled) const {
     const Cells held = ring.cells & ring.previous;
+    const Depth depth = depthOf(ring);
     for (uint16_t i = 0; i < NUM_PIXELS; i++) {
       if (ring.cells.bit(i)) {
-        actual_led_strip_set_pixel_hsv(strip, i, held.bit(i) ? settled : live);
+        actual_led_strip_set_pixel_hsv(strip, i, held.bit(i) ? settled : live, level(depth.at(i)));
       }
     }
+  }
+
+  // Each generation added into the planes as a ripple of half adders: a plane
+  // keeps the column sum and hands its carry to the plane above. That is the
+  // addition a per cell loop would do, except that Cells is two words and every
+  // cell on the strip goes through it at once, so the whole window is
+  // WINDOW * PLANES of these rather than WINDOW passes over a hundred cells.
+  static Depth depthOf(const Ring& ring) {
+    Depth depth;
+    for (int w = 0; w < WINDOW; w++) {
+      Cells carry = ring.recent[w];
+      for (int p = 0; p < PLANES; p++) {
+        const Cells sum = depth.plane[p] ^ carry;
+        carry = depth.plane[p] & carry;
+        depth.plane[p] = sum;
+      }
+    }
+    return depth;
+  }
+
+  static uint8_t level(int depth) {
+    return (uint8_t)(VALUE_ARRIVED + (depth - 1) * VALUE_STEP);
   }
 
   Cells successor(Cells cells) const {
@@ -265,12 +352,30 @@ private:
     ring.cells = Cells(((uint64_t)noise(seed, generation, 0) << 32) | noise(seed, generation, 1),
                        ((uint64_t)noise(seed, generation, 2) << 32) | noise(seed, generation, 3)) & RING;
     ring.previous = Cells();
+    blank(ring);
     forget(ring);
   }
 
   static void remember(Ring& ring, Cells state) {
     ring.history[ring.historyNext] = smallestTurn(state);
     ring.historyNext = (ring.historyNext + 1) % HISTORY;
+  }
+
+  static void record(Ring& ring, Cells state) {
+    ring.recent[ring.recentNext] = state;
+    ring.recentNext = (ring.recentNext + 1) % WINDOW;
+  }
+
+  // An opening and a reseed have nothing behind them, so everything they light
+  // has just arrived and draws at the bottom of the ramp. The window fills over
+  // the generations that follow, and the strip climbs out of it as the pattern
+  // finds the cells it keeps.
+  static void blank(Ring& ring) {
+    for (int w = 0; w < WINDOW; w++) {
+      ring.recent[w] = Cells();
+    }
+    ring.recentNext = 0;
+    record(ring, ring.cells);
   }
 
   static void forget(Ring& ring) {
