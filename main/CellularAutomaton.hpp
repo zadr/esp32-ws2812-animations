@@ -142,7 +142,7 @@ private:
   // A generation is a discrete event, so this is its dwell rather than a frame
   // interval, and it is the whole of how fast the ring moves. The count falls
   // out of the run, so this is the only figure to move.
-  static constexpr int MS_PER_GENERATION = 190;
+  static constexpr int MS_PER_GENERATION = 250;
   static constexpr int GENERATIONS = RUN_MS / MS_PER_GENERATION;
   static_assert(GENERATIONS >= NUM_PIXELS * 5, "the run is short of five laps of the ring");
 
@@ -156,8 +156,8 @@ private:
   // whichever generation the window ends on, and holds a level instead of
   // swinging a step either side of one.
   //
-  // Eight of them is a second and a half at MS_PER_GENERATION, which is about as
-  // far back as the eye still has the strip; further and a cell's brightness is
+  // Eight of them is two seconds at MS_PER_GENERATION, which is about as far
+  // back as the eye still has the strip; further and a cell's brightness is
   // reporting a pattern that has already left it. Eight also puts three steps
   // between arrival and alternation and four more between alternation and
   // standing still, so those three readings are apart rather than adjacent.
