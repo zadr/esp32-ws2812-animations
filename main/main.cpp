@@ -202,24 +202,48 @@ static constexpr Group grouped(Entry (&variants)[N]) {
 // took 42% of the strip, and bounce, which registers one, took 3%. Fourteen
 // animations is 7.1% each.
 Group groups[] = {
-  grouped(fullRainbowVariants),
-  grouped(rainbowSliceVariants),
-  grouped(rainbowDichromaticVariants),
-  grouped(dropInVariants),
-  grouped(dropOffVariants),
-  grouped(fillInVariants),
-  grouped(bounceVariants),
+  // grouped(fullRainbowVariants),
+  // grouped(rainbowSliceVariants),
+  // grouped(rainbowDichromaticVariants),
+  // grouped(dropInVariants),
+  // grouped(dropOffVariants),
+  // grouped(fillInVariants),
+  // grouped(bounceVariants),
   // grouped(twinkleVariants),
-  grouped(multiRainbowVariants),
+  // grouped(multiRainbowVariants),
   grouped(automatonVariants),
-  grouped(theaterChaseVariants),
-  grouped(interferenceVariants),
-  grouped(collisionVariants),
-  grouped(rippleVariants),
-  grouped(sortVariants),
+  // grouped(theaterChaseVariants),
+  // grouped(interferenceVariants),
+  // grouped(collisionVariants),
+  // grouped(rippleVariants),
+  // grouped(sortVariants),
 };
 
 static const int GROUP_COUNT = sizeof(groups) / sizeof(groups[0]);
+
+// What goes between runs, drawn the way the rotation is drawn: an animation
+// first, then which of its variants. Separate from groups, so what sits between
+// runs and what the rotation is made of are two lists and neither reads off
+// the other. A sort therefore reaches its fourteen the same way it would from
+// the rotation, algorithm and dataset settled by the second draw.
+Group interludes[] = {
+  grouped(fullRainbowVariants),
+  grouped(rainbowSliceVariants),
+  grouped(rainbowDichromaticVariants),
+  grouped(multiRainbowVariants),
+  grouped(sortVariants),
+};
+
+static const int INTERLUDE_COUNT = sizeof(interludes) / sizeof(interludes[0]);
+
+// The slot is the fixed thing here, so an animation is held to it rather than
+// to the rate it was sized at: every one of these draws from t alone, so a
+// longer run is the same pattern travelling slower and nothing else. Three
+// turns of the wheel land at ten seconds a turn instead of six, which across a
+// hundred pixels still reads as motion along the strip, and a sort spreads its
+// intro, replay and settle over the slot in the proportions its own duration()
+// gives them.
+static const int INTERLUDE_MS = 30000;
 
 // CONFIG_FREERTOS_HZ is 100, so vTaskDelay resolves to whole 10ms ticks and this
 // is the shortest interval the driver can actually hold. It is also the interval
@@ -270,12 +294,15 @@ static void transitionTo(Animation* incoming) {
   }
 }
 
-static void run(Animation* animation, const char* name) {
+// An animation is asked how long it wants unless the caller is filling a slot
+// of its own size, which is the one thing here that is not the animation's to
+// decide.
+static void run(Animation* animation, const char* name, int heldToMs = 0) {
   // setup() decides the run and duration() reports on what it decided, so the
   // order is load bearing and the answer is only good for this run. A transition
   // renders this animation, so it comes after setup() as well.
   animation->setup();
-  const int durationMs = animation->duration();
+  const int durationMs = heldToMs ? heldToMs : animation->duration();
 
   // Two is the floor. The first frame has to deliver 0 and the last has to
   // deliver 65535, and one frame cannot be both.
@@ -341,6 +368,12 @@ void randomlySelect(void) {
   run(entry.animation, entry.name);
 }
 
+void interlude(void) {
+  const Group& group = interludes[esp_random_max(INTERLUDE_COUNT - 1)];
+  const Entry& entry = group.variants[esp_random_max(group.count - 1)];
+  run(entry.animation, entry.name, INTERLUDE_MS);
+}
+
 extern "C" void app_main(void) {
   esp_wifi_stop();
 
@@ -353,6 +386,8 @@ extern "C" void app_main(void) {
     // single();
     // inOrder();
     randomlySelect();
+    delay(100);
+    interlude();
     delay(100);
   }
 }
