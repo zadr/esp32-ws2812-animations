@@ -190,6 +190,15 @@ In the order the groups are declared:
   number through the constructor. Cells that were alive last generation too take
   a second hue, and a state repeating a rotation of one already seen reseeds at
   random.
+- Life automaton (`LifeAutomaton.hpp`). An outer-totalistic B/S rule on a board
+  ten strips on a side, seen through a window the size of the strip that stands
+  where the board is busiest and crosses to somewhere else when it is not. Cells
+  alive last generation too take a second hue and brightness counts how many of
+  the last eight generations a cell was alive in, so a glider, a blinker and a
+  block read differently. The rule is drawn per run from the 194431 members of
+  the family that hold both hues for at least half a run, which are carried as a
+  membership blob (`tools/liferules`), and logged so one worth keeping can be
+  pinned by its code through the constructor.
 - Theater chase (`TheaterChase.hpp`). Lit dots at a fixed spacing running along
   the strip with the gaps unlit, alternating between a hue and its complement so
   the direction of travel is legible. Both directions.

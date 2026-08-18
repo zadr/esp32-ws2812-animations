@@ -21,6 +21,7 @@
 #include "FillIn.hpp"
 #include "FlashWhite.hpp"
 #include "Interference.hpp"
+#include "LifeAutomaton.hpp"
 #include "MultiRainbow.hpp"
 #include "RainbowDichromatic.hpp"
 #include "RainbowFull.hpp"
@@ -67,6 +68,7 @@ BlinkComplement blinkComplementAllHuesEvolution(buffer, true, true);
 Bounce bounce(buffer);
 Twinkle twinkle(buffer);
 CellularAutomaton automatonAny(buffer);
+LifeAutomaton lifeAny(buffer);
 TheaterChase theaterChaseForward(buffer, 3, true);
 TheaterChase theaterChaseBackward(buffer, 3, false);
 Interference interference(buffer);
@@ -151,6 +153,10 @@ Entry automatonVariants[] = {
   {&automatonAny, "cellular automaton"},
 };
 
+Entry lifeVariants[] = {
+  {&lifeAny, "life automaton"},
+};
+
 Entry theaterChaseVariants[] = {
   {&theaterChaseForward, "theater chase fwd"},
   {&theaterChaseBackward, "theater chase rev"},
@@ -212,6 +218,7 @@ Group groups[] = {
   // grouped(twinkleVariants),
   // grouped(multiRainbowVariants),
   grouped(automatonVariants),
+  // grouped(lifeVariants),
   // grouped(theaterChaseVariants),
   // grouped(interferenceVariants),
   // grouped(collisionVariants),
@@ -235,6 +242,24 @@ Group interludes[] = {
 };
 
 static const int INTERLUDE_COUNT = sizeof(interludes) / sizeof(interludes[0]);
+
+// The pools an interlude is drawn from when the animation it leads into asks
+// for a particular one. Every rainbow is a rainbow, so the pairing names the
+// kind and the draw still settles which of them and in which direction.
+Group rainbowInterludes[] = {
+  grouped(fullRainbowVariants),
+  grouped(rainbowSliceVariants),
+  grouped(rainbowDichromaticVariants),
+  grouped(multiRainbowVariants),
+};
+
+static const int RAINBOW_INTERLUDE_COUNT = sizeof(rainbowInterludes) / sizeof(rainbowInterludes[0]);
+
+Group sortInterludes[] = {
+  grouped(sortVariants),
+};
+
+static const int SORT_INTERLUDE_COUNT = sizeof(sortInterludes) / sizeof(sortInterludes[0]);
 
 // The slot is the fixed thing here, so an animation is held to it rather than
 // to the rate it was sized at: every one of these draws from t alone, so a
@@ -362,15 +387,40 @@ void inOrder(void) {
   }
 }
 
+// An animation first, then which of its variants.
+static const Entry& drawFrom(const Group* pool, int count) {
+  const Group& group = pool[esp_random_max(count - 1)];
+  return group.variants[esp_random_max(group.count - 1)];
+}
+
+// Picking is separate from running so that what comes next can be known while
+// the interlude ahead of it is still being chosen. Two draws would answer with
+// two different animations.
+static const Entry& pick(void) {
+  return drawFrom(groups, GROUP_COUNT);
+}
+
 void randomlySelect(void) {
-  const Group& group = groups[esp_random_max(GROUP_COUNT - 1)];
-  const Entry& entry = group.variants[esp_random_max(group.count - 1)];
+  const Entry& entry = pick();
   run(entry.animation, entry.name);
 }
 
-void interlude(void) {
-  const Group& group = interludes[esp_random_max(INTERLUDE_COUNT - 1)];
-  const Entry& entry = group.variants[esp_random_max(group.count - 1)];
+// The interlude is chosen for what follows it: a rainbow ahead of the
+// elementary automaton, a sort ahead of life. Everything else in the rotation
+// draws over the whole list, which is also what the entries commented out of
+// groups[] will do when they come back.
+void interlude(const Entry& next) {
+  const Group* pool = interludes;
+  int count = INTERLUDE_COUNT;
+  if (next.animation == &automatonAny) {
+    pool = rainbowInterludes;
+    count = RAINBOW_INTERLUDE_COUNT;
+  } else if (next.animation == &lifeAny) {
+    pool = sortInterludes;
+    count = SORT_INTERLUDE_COUNT;
+  }
+
+  const Entry& entry = drawFrom(pool, count);
   run(entry.animation, entry.name, INTERLUDE_MS);
 }
 
@@ -385,9 +435,11 @@ extern "C" void app_main(void) {
   while (1) {
     // single();
     // inOrder();
-    randomlySelect();
+    // randomlySelect();
+    const Entry& next = pick();
+    interlude(next);
     delay(100);
-    interlude();
+    run(next.animation, next.name);
     delay(100);
   }
 }
